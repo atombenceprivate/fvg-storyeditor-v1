@@ -8,12 +8,43 @@ import sys
 import csv
 import difflib
 import subprocess
+import os
+import platform
+import threading
+import urllib.request
+import webbrowser
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from html import escape
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
+
+
+APP_VERZIO = "0.2.0"
+GITHUB_TARHELY = "atombenceprivate/fvg-storyeditor-v1"
+GITHUB_KIADAS_API = f"https://api.github.com/repos/{GITHUB_TARHELY}/releases/latest"
+
+SZOVEGEK = {
+    "hu": {
+        "file": "Fájl", "tools": "Eszközök", "settings": "Beállítások", "new": "Új projekt",
+        "open": "Megnyitás…", "save": "Mentés", "save_as": "Mentés másként…", "exit": "Kilépés",
+        "scenes": "Jelenetek", "scene_editor": "Jelenet szerkesztése", "characters": "Karakterek",
+        "title": "Cím:", "author": "Szerző:", "save_scene": "Jelenet módosításainak rögzítése",
+        "language": "Alkalmazás nyelve", "hungarian": "Magyar", "english": "English",
+        "beat_sheet": "Beat Sheet…", "shot_list": "Kamera-beállítási lista…",
+        "check_update": "Frissítések ellenőrzése…", "update_available": "Új verzió elérhető",
+    },
+    "en": {
+        "file": "File", "tools": "Tools", "settings": "Settings", "new": "New project",
+        "open": "Open…", "save": "Save", "save_as": "Save as…", "exit": "Exit",
+        "scenes": "Scenes", "scene_editor": "Scene editor", "characters": "Characters",
+        "title": "Title:", "author": "Author:", "save_scene": "Save scene changes",
+        "language": "Application language", "hungarian": "Magyar", "english": "English",
+        "beat_sheet": "Beat sheet…", "shot_list": "Camera shot list…",
+        "check_update": "Check for updates…", "update_available": "Update available",
+    },
+}
 
 
 class UvegGomb(tk.Canvas):
@@ -65,6 +96,8 @@ class UvegGomb(tk.Canvas):
 class ForgatokonyvIro(tk.Tk):
     def __init__(self):
         super().__init__()
+        self.beallitasok = self.beallitasok_betoltese()
+        self.nyelv = self.beallitasok.get("nyelv", "hu")
         self.title("FVG Story Editor — Íróstúdió")
         self.geometry("1120x720")
         self.minsize(860, 550)
@@ -76,12 +109,34 @@ class ForgatokonyvIro(tk.Tk):
         self.after(350, self.indulasi_ellenorzes)
         self.after(180000, self.auto_mentes)
         self.after(600, self.autosave_helyreallitas_felajanlasa)
+        self.after(1800, self.frissites_ellenorzese_hatterben)
         if len(sys.argv) > 1 and sys.argv[1]:
             self.after(120, lambda: self.megnyit_utvonal(sys.argv[1]))
 
     @staticmethod
     def uj_projekt_adat():
-        return {"cim": "Új forgatókönyv", "szerzo": "", "jelenetek": [], "karakterek": [], "karakter_adatok": {}, "verziok": [], "dramaturgia": [], "jegyzetek": "", "napi_cel": 500, "referenciak": []}
+        return {"cim": "Új forgatókönyv", "szerzo": "", "jelenetek": [], "karakterek": [], "karakter_adatok": {}, "verziok": [], "dramaturgia": [], "beatsheet": [], "kamera_beallitasok": [], "jegyzetek": "", "napi_cel": 500, "referenciak": []}
+
+    def t(self, kulcs):
+        return SZOVEGEK.get(self.nyelv, SZOVEGEK["hu"]).get(kulcs, SZOVEGEK["hu"].get(kulcs, kulcs))
+
+    @staticmethod
+    def beallitasok_utvonala():
+        alap = Path(os.environ.get("APPDATA", Path.home() / ".config")) / "FVG Story Editor"
+        return alap / "settings.json"
+
+    def beallitasok_betoltese(self):
+        try:
+            return json.loads(self.beallitasok_utvonala().read_text(encoding="utf-8"))
+        except (OSError, ValueError, json.JSONDecodeError):
+            return {"nyelv": "hu", "automatikus_frissites_ellenorzes": True}
+
+    def beallitasok_mentese(self):
+        try:
+            cel = self.beallitasok_utvonala(); cel.parent.mkdir(parents=True, exist_ok=True)
+            cel.write_text(json.dumps(self.beallitasok, ensure_ascii=False, indent=2), encoding="utf-8")
+        except OSError:
+            pass
 
     def letrehoz_felulet(self):
         self.szinek = {
@@ -94,11 +149,11 @@ class ForgatokonyvIro(tk.Tk):
         self.beallit_stilusok()
         menu = tk.Menu(self)
         fajl = tk.Menu(menu, tearoff=False)
-        fajl.add_command(label="Új projekt", command=self.uj_projekt, accelerator="Ctrl+N")
+        fajl.add_command(label=self.t("new"), command=self.uj_projekt, accelerator="Ctrl+N")
         fajl.add_command(label="Új projekt varázsló…", command=self.projekt_varazslo)
-        fajl.add_command(label="Megnyitás…", command=self.megnyit, accelerator="Ctrl+O")
-        fajl.add_command(label="Mentés", command=self.ment, accelerator="Ctrl+S")
-        fajl.add_command(label="Mentés másként…", command=self.ment_maskent)
+        fajl.add_command(label=self.t("open"), command=self.megnyit, accelerator="Ctrl+O")
+        fajl.add_command(label=self.t("save"), command=self.ment, accelerator="Ctrl+S")
+        fajl.add_command(label=self.t("save_as"), command=self.ment_maskent)
         fajl.add_separator()
         fajl.add_command(label="Verzióelőzmények…", command=self.verzio_elzmenyek, accelerator="Ctrl+H")
         fajl.add_command(label="Exportálás PDF-be…", command=self.pdf_export)
@@ -108,8 +163,8 @@ class ForgatokonyvIro(tk.Tk):
         fajl.add_command(label="Fountain importálása…", command=self.fountain_import)
         fajl.add_command(label="Final Draft (.fdx) importálása…", command=self.fdx_import)
         fajl.add_separator()
-        fajl.add_command(label="Kilépés", command=self.destroy)
-        menu.add_cascade(label="Fájl", menu=fajl)
+        fajl.add_command(label=self.t("exit"), command=self.destroy)
+        menu.add_cascade(label=self.t("file"), menu=fajl)
         eszkozok = tk.Menu(menu, tearoff=False)
         eszkozok.add_command(label="Keresés és csere…", command=self.keres_es_csere, accelerator="Ctrl+F")
         eszkozok.add_command(label="Statisztikák…", command=self.statisztikak)
@@ -122,6 +177,8 @@ class ForgatokonyvIro(tk.Tk):
         eszkozok.add_command(label="Dialóguselemzés…", command=self.dialogus_elemzes)
         eszkozok.add_command(label="Jelenetjegyzetek…", command=self.jelenet_jegyzetek)
         eszkozok.add_command(label="Produkciós bontás…", command=self.produkcios_bontas)
+        eszkozok.add_command(label=self.t("beat_sheet"), command=self.beatsheet)
+        eszkozok.add_command(label=self.t("shot_list"), command=self.kamera_beallitas_lista)
         eszkozok.add_command(label="Verziók összehasonlítása…", command=self.verzio_osszehasonlitas)
         eszkozok.add_command(label="Idővonal nézet…", command=self.idovonal)
         eszkozok.add_command(label="Produkciós összesítő…", command=self.produkcios_osszesito)
@@ -132,7 +189,14 @@ class ForgatokonyvIro(tk.Tk):
         eszkozok.add_command(label="Aktuális jelenet duplikálása", command=self.jelenet_duplikalasa, accelerator="Ctrl+D")
         eszkozok.add_separator()
         eszkozok.add_command(label="Komponensek ellenőrzése", command=lambda: self.indulasi_ellenorzes(reszletes=True))
-        menu.add_cascade(label="Eszközök", menu=eszkozok)
+        menu.add_cascade(label=self.t("tools"), menu=eszkozok)
+        beallitasok = tk.Menu(menu, tearoff=False)
+        nyelv = tk.Menu(beallitasok, tearoff=False)
+        nyelv.add_command(label=self.t("hungarian"), command=lambda: self.nyelv_valtas("hu"))
+        nyelv.add_command(label=self.t("english"), command=lambda: self.nyelv_valtas("en"))
+        beallitasok.add_cascade(label=self.t("language"), menu=nyelv)
+        beallitasok.add_command(label=self.t("check_update"), command=lambda: self.frissites_ellenorzese_hatterben(kezzel=True))
+        menu.add_cascade(label=self.t("settings"), menu=beallitasok)
         self.config(menu=menu)
         self.bind_all("<Control-n>", lambda e: self.uj_projekt())
         self.bind_all("<Control-o>", lambda e: self.megnyit())
@@ -149,21 +213,21 @@ class ForgatokonyvIro(tk.Tk):
         cimkeret.pack(side="left")
         ttk.Label(cimkeret, text="FVG STORY EDITOR", style="AppTitle.TLabel").pack(anchor="w")
         ttk.Label(cimkeret, text="A történeted itt kap formát.", style="Tagline.TLabel").pack(anchor="w")
-        UvegGomb(fejlec, "Mentés", self.ment, accent=True, width=112, hatter=self.szinek["hatterszin"]).pack(side="right", pady=4)
+        UvegGomb(fejlec, self.t("save"), self.ment, accent=True, width=112, hatter=self.szinek["hatterszin"]).pack(side="right", pady=4)
 
         info = ttk.Frame(self, style="Header.TFrame", padding=(22, 2, 22, 16))
         info.pack(fill="x")
-        ttk.Label(info, text="Cím:").pack(side="left")
+        ttk.Label(info, text=self.t("title")).pack(side="left")
         self.cim = ttk.Entry(info, width=38)
         self.cim.pack(side="left", padx=(5, 18))
-        ttk.Label(info, text="Szerző:").pack(side="left")
+        ttk.Label(info, text=self.t("author")).pack(side="left")
         self.szerzo = ttk.Entry(info, width=30)
         self.szerzo.pack(side="left", padx=5)
 
         panel = ttk.PanedWindow(self, orient="horizontal", style="Studio.TPanedwindow")
         panel.pack(fill="both", expand=True, padx=22, pady=(0, 18))
 
-        bal = ttk.Labelframe(panel, text="Jelenetek", padding=8)
+        bal = ttk.Labelframe(panel, text=self.t("scenes"), padding=8)
         # A weight opció nem érhető el minden Ubuntuhoz csomagolt Tk verzióban.
         panel.add(bal)
         self.jelenet_lista = tk.Listbox(bal, exportselection=False, activestyle="none",
@@ -183,7 +247,7 @@ class ForgatokonyvIro(tk.Tk):
         UvegGomb(rendezes, "↑ Feljebb", lambda: self.jelenet_mozgat(-1), width=92).pack(side="left")
         UvegGomb(rendezes, "↓ Lejjebb", lambda: self.jelenet_mozgat(1), width=92).pack(side="right")
 
-        kozep = ttk.Labelframe(panel, text="Jelenet szerkesztése", padding=10)
+        kozep = ttk.Labelframe(panel, text=self.t("scene_editor"), padding=10)
         panel.add(kozep)
         sor = ttk.Frame(kozep)
         sor.pack(fill="x", pady=(0, 8))
@@ -213,9 +277,9 @@ class ForgatokonyvIro(tk.Tk):
         szerkeszto_also.pack(fill="x")
         self.szamlalo = ttk.Label(szerkeszto_also, text="0 szó · 0 karakter", foreground=self.szinek["halvany"])
         self.szamlalo.pack(side="left", pady=2)
-        UvegGomb(szerkeszto_also, "Jelenet módosításainak rögzítése", self.jelenet_rogzit, accent=True, width=264).pack(side="right")
+        UvegGomb(szerkeszto_also, self.t("save_scene"), self.jelenet_rogzit, accent=True, width=264).pack(side="right")
 
-        jobb = ttk.Labelframe(panel, text="Karakterek", padding=8)
+        jobb = ttk.Labelframe(panel, text=self.t("characters"), padding=8)
         panel.add(jobb)
         self.karakter_lista = tk.Listbox(jobb, height=8, activestyle="none",
             bg=self.szinek["panel"], fg=self.szinek["szoveg"], selectbackground=self.szinek["kiemeles"],
@@ -410,7 +474,7 @@ class ForgatokonyvIro(tk.Tk):
         """Elmenti a projekt aktuális állapotát egy visszaállítható változatként."""
         adat = {
             "cim": self.projekt["cim"], "szerzo": self.projekt["szerzo"],
-            "jelenetek": self.projekt["jelenetek"], "karakterek": self.projekt["karakterek"], "karakter_adatok": self.projekt.get("karakter_adatok", {}), "dramaturgia": self.projekt.get("dramaturgia", []), "jegyzetek": self.projekt.get("jegyzetek", ""), "napi_cel": self.projekt.get("napi_cel", 500),
+            "jelenetek": self.projekt["jelenetek"], "karakterek": self.projekt["karakterek"], "karakter_adatok": self.projekt.get("karakter_adatok", {}), "dramaturgia": self.projekt.get("dramaturgia", []), "beatsheet": self.projekt.get("beatsheet", []), "kamera_beallitasok": self.projekt.get("kamera_beallitasok", []), "jegyzetek": self.projekt.get("jegyzetek", ""), "napi_cel": self.projekt.get("napi_cel", 500),
         }
         # JSON-körrel mély másolat készül, így a régi változat nem módosul később.
         masolat = json.loads(json.dumps(adat, ensure_ascii=False))
@@ -444,6 +508,8 @@ class ForgatokonyvIro(tk.Tk):
             adat.setdefault("verziok", [])
             adat.setdefault("karakter_adatok", {})
             adat.setdefault("dramaturgia", [])
+            adat.setdefault("beatsheet", [])
+            adat.setdefault("kamera_beallitasok", [])
             adat.setdefault("jegyzetek", "")
             adat.setdefault("napi_cel", 500)
             adat.setdefault("referenciak", [])
@@ -464,10 +530,125 @@ class ForgatokonyvIro(tk.Tk):
                     self.projekt = auto_adat
                     for j in self.projekt["jelenetek"]: j.setdefault("blokkok", {}); j.setdefault("kartya", {}); j.setdefault("bontas", {}); j.setdefault("megjegyzesek", ""); j.setdefault("kepek", [])
                     self.projekt.setdefault("referenciak", [])
+                    self.projekt.setdefault("beatsheet", [])
+                    self.projekt.setdefault("kamera_beallitasok", [])
                     self.cim.delete(0, "end"); self.cim.insert(0, self.projekt["cim"])
                     self.szerzo.delete(0, "end"); self.szerzo.insert(0, self.projekt.get("szerzo", ""))
                     self.frissit_listak(); self.jelenet_mezo_tisztit(); self.statusz.config(text="●  Projekt-specifikus automatikus mentés visszaállítva")
         except (OSError, ValueError, json.JSONDecodeError) as hiba: messagebox.showerror("Megnyitási hiba", str(hiba))
+
+    def beatsheet(self):
+        """A történet beatjeinek (történetfordulóinak) szerkeszthető listája."""
+        self.adatokat_osszegyujt()
+        alapok = ["Nyitókép", "Téma felvetése", "Kiváltó esemény", "Első fordulópont", "Középpont", "Mélypont", "Finálé", "Zárókép"]
+        beatek = self.projekt.setdefault("beatsheet", [])
+        if not beatek:
+            beatek.extend({"nev": nev, "leiras": "", "jelenet": ""} for nev in alapok)
+        ablak = tk.Toplevel(self); ablak.title("Beat Sheet — FVG Story Editor"); ablak.geometry("820x520"); ablak.configure(bg=self.szinek["panel"]); ablak.transient(self)
+        ttk.Label(ablak, text="BEAT SHEET", style="AppTitle.TLabel").pack(anchor="w", padx=18, pady=(18, 3))
+        ttk.Label(ablak, text="A történet fontos fordulópontjai. A sorrend fogd-és-ejtsd helyett a nyilakkal is módosítható.").pack(anchor="w", padx=18, pady=(0, 10))
+        tabla = ttk.Treeview(ablak, columns=("nev", "jelenet", "leiras"), show="headings", selectmode="browse")
+        for azonosito, cim, szelesseg in (("nev", "Beat", 180), ("jelenet", "Kapcsolt jelenet", 230), ("leiras", "Jegyzet", 350)):
+            tabla.heading(azonosito, text=cim); tabla.column(azonosito, width=szelesseg, anchor="w")
+        tabla.pack(fill="both", expand=True, padx=18, pady=(0, 10))
+        def frissit(kijelolt=None):
+            tabla.delete(*tabla.get_children())
+            for i, beat in enumerate(beatek): tabla.insert("", "end", iid=str(i), values=(beat.get("nev", ""), beat.get("jelenet", ""), beat.get("leiras", "")))
+            if kijelolt is not None and 0 <= kijelolt < len(beatek): tabla.selection_set(str(kijelolt))
+        def szerkeszt(index=None):
+            adat = beatek[index] if index is not None else {"nev": "Új beat", "jelenet": "", "leiras": ""}
+            szerk = tk.Toplevel(ablak); szerk.title("Beat szerkesztése"); szerk.configure(bg=self.szinek["panel"]); szerk.transient(ablak)
+            ttk.Label(szerk, text="Beat neve:").pack(anchor="w", padx=16, pady=(16, 3)); nev = ttk.Entry(szerk, width=55); nev.insert(0, adat.get("nev", "")); nev.pack(padx=16)
+            ttk.Label(szerk, text="Kapcsolt jelenet:").pack(anchor="w", padx=16, pady=(10, 3)); jelenet = ttk.Combobox(szerk, values=[j["fejlec"] for j in self.projekt["jelenetek"]], width=52); jelenet.set(adat.get("jelenet", "")); jelenet.pack(padx=16)
+            ttk.Label(szerk, text="Jegyzet:").pack(anchor="w", padx=16, pady=(10, 3)); leiras = tk.Text(szerk, width=55, height=5, bg=self.szinek["szerkeszto"], fg=self.szinek["szoveg"], insertbackground=self.szinek["kiemeles"], relief="flat"); leiras.insert("1.0", adat.get("leiras", "")); leiras.pack(padx=16)
+            def mentes():
+                uj = {"nev": nev.get().strip() or "Névtelen beat", "jelenet": jelenet.get().strip(), "leiras": leiras.get("1.0", "end-1c").strip()}
+                if index is None: beatek.append(uj); cel = len(beatek) - 1
+                else: beatek[index] = uj; cel = index
+                frissit(cel); szerk.destroy(); self.statusz.config(text="●  Beat Sheet mentve")
+            UvegGomb(szerk, "Mentés", mentes, accent=True, width=100).pack(anchor="e", padx=16, pady=16)
+        def kivalasztott():
+            k = tabla.selection(); return int(k[0]) if k else None
+        def torol():
+            i = kivalasztott()
+            if i is not None and messagebox.askyesno("Beat törlése", "Törlöd a kijelölt beatet?", parent=ablak): beatek.pop(i); frissit()
+        def mozgat(irany):
+            i = kivalasztott(); uj = None if i is None else i + irany
+            if uj is not None and 0 <= uj < len(beatek): beatek[i], beatek[uj] = beatek[uj], beatek[i]; frissit(uj)
+        also = ttk.Frame(ablak, padding=(18, 0, 18, 18)); also.pack(fill="x")
+        UvegGomb(also, "+ Beat", lambda: szerkeszt(), accent=True, width=90).pack(side="left")
+        UvegGomb(also, "Szerkesztés", lambda: (szerkeszt(kivalasztott()) if kivalasztott() is not None else None), width=110).pack(side="left", padx=7)
+        UvegGomb(also, "↑", lambda: mozgat(-1), width=45).pack(side="left"); UvegGomb(also, "↓", lambda: mozgat(1), width=45).pack(side="left", padx=4)
+        UvegGomb(also, "Törlés", torol, width=80).pack(side="right")
+        frissit()
+
+    def kamera_beallitas_lista(self):
+        """Produkciós kamera shot lista jelenethez kötött beállításokkal."""
+        self.adatokat_osszegyujt(); lista = self.projekt.setdefault("kamera_beallitasok", [])
+        ablak = tk.Toplevel(self); ablak.title("Kamera-beállítási lista — FVG Story Editor"); ablak.geometry("900x520"); ablak.configure(bg=self.szinek["panel"]); ablak.transient(self)
+        ttk.Label(ablak, text="KAMERA-BEÁLLÍTÁSI LISTA", style="AppTitle.TLabel").pack(anchor="w", padx=18, pady=(18, 3))
+        ttk.Label(ablak, text="Tervezd meg jelenetenként a képkivágást, kameramozgást és technikai megjegyzéseket.").pack(anchor="w", padx=18, pady=(0, 10))
+        tabla = ttk.Treeview(ablak, columns=("jelenet", "tipus", "mozgas", "leiras"), show="headings", selectmode="browse")
+        for azonosito, cim, szelesseg in (("jelenet", "Jelenet", 230), ("tipus", "Beállítás", 130), ("mozgas", "Mozgás", 130), ("leiras", "Leírás / megjegyzés", 350)):
+            tabla.heading(azonosito, text=cim); tabla.column(azonosito, width=szelesseg, anchor="w")
+        tabla.pack(fill="both", expand=True, padx=18, pady=(0, 10))
+        def frissit(kijelolt=None):
+            tabla.delete(*tabla.get_children())
+            for i, shot in enumerate(lista): tabla.insert("", "end", iid=str(i), values=(shot.get("jelenet", ""), shot.get("tipus", ""), shot.get("mozgas", ""), shot.get("leiras", "")))
+            if kijelolt is not None and 0 <= kijelolt < len(lista): tabla.selection_set(str(kijelolt))
+        def szerkeszt(index=None):
+            adat = lista[index] if index is not None else {}
+            szerk = tk.Toplevel(ablak); szerk.title("Kamera-beállítás"); szerk.configure(bg=self.szinek["panel"]); szerk.transient(ablak)
+            mezok = {}
+            definiciok = (("jelenet", "Jelenet", [j["fejlec"] for j in self.projekt["jelenetek"]]), ("tipus", "Beállítás", ["Nagytotál", "Totál", "Kistotál", "Féltotál", "Közelkép", "Nagyközel", "Részlet"]), ("mozgas", "Kameramozgás", ["Statikus", "Svenk", "Kocsizás", "Daru", "Kézikamera", "Steadicam", "Zoom"]))
+            for kulcs, cim, ertekek in definiciok:
+                ttk.Label(szerk, text=cim + ":").pack(anchor="w", padx=16, pady=(12 if mezok else 16, 3)); mezo = ttk.Combobox(szerk, values=ertekek, width=52); mezo.set(adat.get(kulcs, "")); mezo.pack(padx=16); mezok[kulcs] = mezo
+            ttk.Label(szerk, text="Leírás / technikai megjegyzés:").pack(anchor="w", padx=16, pady=(12, 3)); leiras = tk.Text(szerk, width=55, height=5, bg=self.szinek["szerkeszto"], fg=self.szinek["szoveg"], insertbackground=self.szinek["kiemeles"], relief="flat"); leiras.insert("1.0", adat.get("leiras", "")); leiras.pack(padx=16)
+            def mentes():
+                uj = {kulcs: mezo.get().strip() for kulcs, mezo in mezok.items()}; uj["leiras"] = leiras.get("1.0", "end-1c").strip()
+                if index is None: lista.append(uj); cel = len(lista) - 1
+                else: lista[index] = uj; cel = index
+                frissit(cel); szerk.destroy(); self.statusz.config(text="●  Kamera-beállítás mentve")
+            UvegGomb(szerk, "Mentés", mentes, accent=True, width=100).pack(anchor="e", padx=16, pady=16)
+        def kivalasztott():
+            k = tabla.selection(); return int(k[0]) if k else None
+        def torol():
+            i = kivalasztott()
+            if i is not None and messagebox.askyesno("Beállítás törlése", "Törlöd a kijelölt kamera-beállítást?", parent=ablak): lista.pop(i); frissit()
+        also = ttk.Frame(ablak, padding=(18, 0, 18, 18)); also.pack(fill="x")
+        UvegGomb(also, "+ Beállítás", lambda: szerkeszt(), accent=True, width=115).pack(side="left")
+        UvegGomb(also, "Szerkesztés", lambda: (szerkeszt(kivalasztott()) if kivalasztott() is not None else None), width=110).pack(side="left", padx=7)
+        UvegGomb(also, "Törlés", torol, width=80).pack(side="right")
+        frissit()
+
+    def nyelv_valtas(self, nyelv):
+        if nyelv == self.nyelv: return
+        self.beallitasok["nyelv"] = nyelv; self.beallitasok_mentese()
+        if messagebox.askyesno("Language / Nyelv", "A nyelvváltás az alkalmazás újraindításával lép életbe. Újraindítod most?"):
+            self.destroy(); os.execv(sys.executable, [sys.executable, *sys.argv])
+
+    @staticmethod
+    def verzio_kulcs(verzio):
+        return tuple(int(resz) for resz in verzio.lstrip("vV").split("-")[0].split(".") if resz.isdigit())
+
+    def frissites_ellenorzese_hatterben(self, kezzel=False):
+        if not kezzel and not self.beallitasok.get("automatikus_frissites_ellenorzes", True): return
+        def ellenoriz():
+            try:
+                keres = urllib.request.Request(GITHUB_KIADAS_API, headers={"Accept": "application/vnd.github+json", "User-Agent": "FVG-Story-Editor"})
+                with urllib.request.urlopen(keres, timeout=8) as valasz: kiadas = json.loads(valasz.read().decode("utf-8"))
+                uj = kiadas.get("tag_name", "")
+                self.after(0, lambda: self.frissitesi_eredmeny(uj, kiadas.get("html_url", ""), kezzel))
+            except (OSError, ValueError, json.JSONDecodeError):
+                if kezzel: self.after(0, lambda: messagebox.showwarning("Frissítés", "A GitHub kiadásait most nem sikerült elérni."))
+        threading.Thread(target=ellenoriz, daemon=True).start()
+
+    def frissitesi_eredmeny(self, uj_verzio, kiadas_url, kezzel):
+        if self.verzio_kulcs(uj_verzio) > self.verzio_kulcs(APP_VERZIO):
+            uzenet = f"{self.t('update_available')}: {uj_verzio}\nJelenlegi verzió: {APP_VERZIO}\n\nMegnyitom a GitHub Release oldalát a rendszeredhez való telepítő letöltéséhez?"
+            if messagebox.askyesno(self.t("update_available"), uzenet): webbrowser.open(kiadas_url)
+        elif kezzel:
+            messagebox.showinfo("Frissítés", f"Az alkalmazás naprakész. Jelenlegi verzió: {APP_VERZIO}")
 
     def pdf_export(self):
         """A jeleneteket nyomtatható, szabványos közelségű PDF-forgatókönyvvé alakítja."""
@@ -829,7 +1010,7 @@ class ForgatokonyvIro(tk.Tk):
                 return
             if messagebox.askyesno("Automatikus mentés", f"Találtam egy automatikus mentést:\n{adat['cim']}\n\nVisszaállítod?"):
                 self.projekt = adat
-                self.projekt.setdefault("verziok", []); self.projekt.setdefault("karakter_adatok", {}); self.projekt.setdefault("dramaturgia", [])
+                self.projekt.setdefault("verziok", []); self.projekt.setdefault("karakter_adatok", {}); self.projekt.setdefault("dramaturgia", []); self.projekt.setdefault("beatsheet", []); self.projekt.setdefault("kamera_beallitasok", [])
                 for jelenet in self.projekt["jelenetek"]: jelenet.setdefault("blokkok", {}); jelenet.setdefault("kartya", {}); jelenet.setdefault("bontas", {}); jelenet.setdefault("megjegyzesek", ""); jelenet.setdefault("kepek", [])
                 self.fajl_utvonal, self.aktualis_jelenet = None, None
                 self.cim.delete(0, "end"); self.cim.insert(0, adat["cim"])
@@ -929,6 +1110,8 @@ class ForgatokonyvIro(tk.Tk):
             self.projekt["karakterek"] = json.loads(json.dumps(valasztott["karakterek"]))
             self.projekt["karakter_adatok"] = json.loads(json.dumps(valasztott.get("karakter_adatok", {})))
             self.projekt["dramaturgia"] = json.loads(json.dumps(valasztott.get("dramaturgia", [])))
+            self.projekt["beatsheet"] = json.loads(json.dumps(valasztott.get("beatsheet", [])))
+            self.projekt["kamera_beallitasok"] = json.loads(json.dumps(valasztott.get("kamera_beallitasok", [])))
             self.projekt["jegyzetek"] = valasztott.get("jegyzetek", "")
             self.projekt["napi_cel"] = valasztott.get("napi_cel", 500)
             self.aktualis_jelenet = None
