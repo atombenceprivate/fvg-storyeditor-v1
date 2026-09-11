@@ -216,6 +216,7 @@ class ForgatokonyvIro(tk.Tk):
         fajl.add_separator()
         fajl.add_command(label="Verzióelőzmények…", command=self.verzio_elzmenyek, accelerator="Ctrl+H")
         fajl.add_command(label="Exportálás PDF-be…", command=self.pdf_export)
+        fajl.add_command(label="Nyomtatási előnézet…", command=self.nyomtatasi_elo_nezet)
         fajl.add_command(label="Exportálás Fountainbe…", command=self.fountain_export)
         fajl.add_command(label="Exportcsomag készítése…", command=self.exportcsomag)
         fajl.add_separator()
@@ -226,6 +227,7 @@ class ForgatokonyvIro(tk.Tk):
         menu.add_cascade(label=self.t("file"), menu=fajl)
         eszkozok = tk.Menu(menu, tearoff=False)
         eszkozok.add_command(label="Keresés és csere…", command=self.keres_es_csere, accelerator="Ctrl+F")
+        eszkozok.add_command(label="Projekt-szintű keresés…", command=self.projekt_kereses)
         eszkozok.add_command(label="Statisztikák…", command=self.statisztikak)
         eszkozok.add_separator()
         eszkozok.add_command(label="Karakterlap szerkesztése…", command=self.karakterlap)
@@ -248,6 +250,7 @@ class ForgatokonyvIro(tk.Tk):
         eszkozok.add_command(label="Aktuális jelenet duplikálása", command=self.jelenet_duplikalasa, accelerator="Ctrl+D")
         eszkozok.add_separator()
         eszkozok.add_command(label="Komponensek ellenőrzése", command=lambda: self.indulasi_ellenorzes(reszletes=True))
+        eszkozok.add_command(label="Projekt ellenőrzése…", command=self.projekt_ellenorzes)
         menu.add_cascade(label=self.t("tools"), menu=eszkozok)
         beallitasok = tk.Menu(menu, tearoff=False)
         nyelv = tk.Menu(beallitasok, tearoff=False)
@@ -320,6 +323,15 @@ class ForgatokonyvIro(tk.Tk):
         ttk.Combobox(eszkoztar, textvariable=self.blokk_tipus, state="readonly", width=19,
             values=("Akció", "Karakter", "Párbeszéd", "Zárójeles utasítás")).pack(side="left", padx=7)
         UvegGomb(eszkoztar, "Formázás alkalmazása", self.blokk_formazas, width=174).pack(side="left")
+        wysiwyg = ttk.Frame(kozep)
+        wysiwyg.pack(fill="x", pady=(0, 7))
+        ttk.Label(wysiwyg, text="WYSIWYG:").pack(side="left", padx=(0, 6))
+        UvegGomb(wysiwyg, "B", lambda: self.wysiwyg_formazas("felkover"), width=38).pack(side="left", padx=2)
+        UvegGomb(wysiwyg, "I", lambda: self.wysiwyg_formazas("doltt"), width=38).pack(side="left", padx=2)
+        UvegGomb(wysiwyg, "U", lambda: self.wysiwyg_formazas("alahuzott"), width=38).pack(side="left", padx=2)
+        UvegGomb(wysiwyg, "←", lambda: self.wysiwyg_formazas("balra"), width=38).pack(side="left", padx=(12, 2))
+        UvegGomb(wysiwyg, "↔", lambda: self.wysiwyg_formazas("kozepre"), width=38).pack(side="left", padx=2)
+        UvegGomb(wysiwyg, "→", lambda: self.wysiwyg_formazas("jobbra"), width=38).pack(side="left", padx=2)
         ttk.Label(kozep, text="A jelenet szövege:").pack(anchor="w")
         self.szoveg = tk.Text(kozep, wrap="word", undo=True, padx=18, pady=16,
             bg=self.szinek["szerkeszto"], fg=self.szinek["szoveg"], insertbackground=self.szinek["kiemeles"],
@@ -332,6 +344,12 @@ class ForgatokonyvIro(tk.Tk):
         self.szoveg.tag_configure("Karakter", justify="center", font=("Sans", 11, "bold"), foreground=self.szinek["kiemeles"], spacing1=12)
         self.szoveg.tag_configure("Párbeszéd", justify="left", lmargin1=70, lmargin2=70, rmargin=70, spacing3=7)
         self.szoveg.tag_configure("Zárójeles utasítás", justify="left", lmargin1=88, lmargin2=88, rmargin=88, foreground=self.szinek["halvany"])
+        self.szoveg.tag_configure("felkover", font=("Sans", 12, "bold"))
+        self.szoveg.tag_configure("doltt", font=("Sans", 12, "italic"))
+        self.szoveg.tag_configure("alahuzott", underline=True)
+        self.szoveg.tag_configure("balra", justify="left")
+        self.szoveg.tag_configure("kozepre", justify="center")
+        self.szoveg.tag_configure("jobbra", justify="right")
         szerkeszto_also = ttk.Frame(kozep)
         szerkeszto_also.pack(fill="x")
         self.szamlalo = ttk.Label(szerkeszto_also, text="0 szó · 0 karakter", foreground=self.szinek["halvany"])
@@ -387,7 +405,7 @@ class ForgatokonyvIro(tk.Tk):
 
     def uj_jelenet(self):
         self.jelenet_rogzit()
-        self.projekt["jelenetek"].append({"fejlec": "INT. HELYSZÍN – NAPPAL", "szoveg": "", "blokkok": {}, "kartya": {}, "bontas": {}, "megjegyzesek": "", "kepek": []})
+        self.projekt["jelenetek"].append(self.uj_jelenet_adat())
         self.frissit_jelenetek()
         i = len(self.projekt["jelenetek"]) - 1
         self.jelenet_lista.selection_set(i); self.jelenet_kivalaszt()
@@ -401,6 +419,7 @@ class ForgatokonyvIro(tk.Tk):
         self.jelenet_fejlec.delete(0, "end"); self.jelenet_fejlec.insert(0, jelenet["fejlec"])
         self.szoveg.delete("1.0", "end"); self.szoveg.insert("1.0", jelenet["szoveg"])
         self.blokkok_rajzol(jelenet.get("blokkok", {}))
+        self.stilusok_rajzol(jelenet.get("stilusok", {}))
         self.frissit_szamlalo()
 
     def jelenet_rogzit(self):
@@ -409,6 +428,7 @@ class ForgatokonyvIro(tk.Tk):
         jelenet["fejlec"] = self.jelenet_fejlec.get().strip() or "CÍM NÉLKÜLI JELENET"
         jelenet["szoveg"] = self.szoveg.get("1.0", "end-1c")
         jelenet.setdefault("blokkok", {})
+        jelenet["stilusok"] = self.stilusok_osszegyujtese()
         self.frissit_jelenetek(kijelolt=self.aktualis_jelenet)
 
     def jelenet_mozgat(self, irany):
@@ -476,6 +496,33 @@ class ForgatokonyvIro(tk.Tk):
             if tipus in ("Akció", "Karakter", "Párbeszéd", "Zárójeles utasítás"):
                 self.szoveg.tag_add(tipus, f"{sor}.0", f"{sor}.end")
 
+    @staticmethod
+    def uj_jelenet_adat(fejlec="INT. HELYSZÍN – NAPPAL"):
+        return {"fejlec": fejlec, "szoveg": "", "blokkok": {}, "stilusok": {}, "statusz": "Vázlat", "kartya": {}, "bontas": {}, "megjegyzesek": "", "kepek": []}
+
+    def stilusok_osszegyujtese(self):
+        return {cimke: [str(index) for index in self.szoveg.tag_ranges(cimke)] for cimke in ("felkover", "doltt", "alahuzott", "balra", "kozepre", "jobbra")}
+
+    def stilusok_rajzol(self, stilusok):
+        for cimke in ("felkover", "doltt", "alahuzott", "balra", "kozepre", "jobbra"):
+            self.szoveg.tag_remove(cimke, "1.0", "end")
+            indexek = stilusok.get(cimke, [])
+            for kezdet, veg in zip(indexek[::2], indexek[1::2]): self.szoveg.tag_add(cimke, kezdet, veg)
+
+    def wysiwyg_formazas(self, cimke):
+        if not self.szoveg.tag_ranges("sel"):
+            messagebox.showinfo("Formázás", "Jelöld ki a formázni kívánt szöveget.")
+            return
+        kezdet, veg = self.szoveg.index("sel.first"), self.szoveg.index("sel.last")
+        if cimke in ("balra", "kozepre", "jobbra"):
+            for masik in ("balra", "kozepre", "jobbra"): self.szoveg.tag_remove(masik, f"{kezdet} linestart", f"{veg} lineend")
+            self.szoveg.tag_add(cimke, f"{kezdet} linestart", f"{veg} lineend")
+        elif self.szoveg.tag_nextrange(cimke, kezdet, veg):
+            self.szoveg.tag_remove(cimke, kezdet, veg)
+        else:
+            self.szoveg.tag_add(cimke, kezdet, veg)
+        self.jelenet_rogzit()
+
     def jelenet_torles(self):
         if self.aktualis_jelenet is None: return
         if not messagebox.askyesno("Jelenet törlése", "Biztosan törlöd ezt a jelenetet?"): return
@@ -514,7 +561,10 @@ class ForgatokonyvIro(tk.Tk):
 
     def frissit_jelenetek(self, kijelolt=None):
         self.jelenet_lista.delete(0, "end")
-        for i, j in enumerate(self.projekt["jelenetek"], 1): self.jelenet_lista.insert("end", f"{i:02d}. {j['fejlec']}")
+        for i, j in enumerate(self.projekt["jelenetek"], 1):
+            statusz = j.get("statusz", "Vázlat")
+            jel = {"Vázlat": "○", "Írás alatt": "◐", "Javítás": "◑", "Kész": "●"}.get(statusz, "○")
+            self.jelenet_lista.insert("end", f"{jel} {i:02d}. {j['fejlec']}")
         if kijelolt is not None: self.jelenet_lista.selection_set(kijelolt)
 
     def frissit_karakterek(self):
@@ -574,6 +624,8 @@ class ForgatokonyvIro(tk.Tk):
             adat.setdefault("referenciak", [])
             for jelenet in adat["jelenetek"]:
                 jelenet.setdefault("blokkok", {})
+                jelenet.setdefault("stilusok", {})
+                jelenet.setdefault("statusz", "Vázlat")
                 jelenet.setdefault("kartya", {})
                 jelenet.setdefault("bontas", {})
                 jelenet.setdefault("megjegyzesek", "")
@@ -587,7 +639,7 @@ class ForgatokonyvIro(tk.Tk):
                 if messagebox.askyesno("Újabb automatikus mentés", "Találtam a projektfájlnál újabb automatikus mentést. Visszaállítod?"):
                     auto_adat = json.loads(autosave.read_text(encoding="utf-8"))
                     self.projekt = auto_adat
-                    for j in self.projekt["jelenetek"]: j.setdefault("blokkok", {}); j.setdefault("kartya", {}); j.setdefault("bontas", {}); j.setdefault("megjegyzesek", ""); j.setdefault("kepek", [])
+                    for j in self.projekt["jelenetek"]: j.setdefault("blokkok", {}); j.setdefault("stilusok", {}); j.setdefault("statusz", "Vázlat"); j.setdefault("kartya", {}); j.setdefault("bontas", {}); j.setdefault("megjegyzesek", ""); j.setdefault("kepek", [])
                     self.projekt.setdefault("referenciak", [])
                     self.projekt.setdefault("beatsheet", [])
                     self.projekt.setdefault("kamera_beallitasok", [])
@@ -1019,6 +1071,57 @@ class ForgatokonyvIro(tk.Tk):
         parbeszed = sum(1 for j in self.projekt["jelenetek"] for t in j.get("blokkok", {}).values() if t == "Párbeszéd")
         messagebox.showinfo("Forgatókönyv-statisztikák", f"Jelenetek: {len(self.projekt['jelenetek'])}\nKarakterek: {karakterek}\nSzavak: {szavak}\nBecsült oldalszám: {max(1, round(szavak / 250, 1))}\nPárbeszédblokkok: {parbeszed}")
 
+    def nyomtatasi_elo_nezet(self):
+        """Olvasásra optimalizált, oldaltörésekkel tagolt előnézet PDF export előtt."""
+        self.adatokat_osszegyujt()
+        ablak = tk.Toplevel(self); ablak.title("Nyomtatási előnézet"); ablak.geometry("760x720"); ablak.configure(bg=self.szinek["panel"]); ablak.transient(self)
+        ttk.Label(ablak, text="NYOMTATÁSI ELŐNÉZET", style="AppTitle.TLabel").pack(anchor="w", padx=18, pady=(18, 8))
+        nezet = tk.Text(ablak, wrap="word", padx=58, pady=34, bg="#f7f3ea", fg="#202020", relief="flat", font=("Courier", 11))
+        nezet.pack(fill="both", expand=True, padx=18, pady=(0, 12)); nezet.tag_configure("cim", justify="center", font=("Courier", 16, "bold")); nezet.tag_configure("fejlec", font=("Courier", 11, "bold")); nezet.tag_configure("karakter", justify="center", font=("Courier", 11, "bold")); nezet.tag_configure("parbeszed", lmargin1=70, lmargin2=70, rmargin=70)
+        nezet.insert("end", self.projekt["cim"] + "\n", "cim"); nezet.insert("end", (self.projekt["szerzo"] or "") + "\n\n")
+        for sorszam, jelenet in enumerate(self.projekt["jelenetek"], 1):
+            nezet.insert("end", f"{sorszam}. {jelenet['fejlec']}\n", "fejlec")
+            for sor, szoveg in enumerate(jelenet["szoveg"].splitlines(), 1):
+                tipus = jelenet.get("blokkok", {}).get(str(sor), "Akció"); cimke = {"Karakter": "karakter", "Párbeszéd": "parbeszed"}.get(tipus, "")
+                nezet.insert("end", szoveg + "\n", cimke)
+            nezet.insert("end", "\n")
+        nezet.configure(state="disabled")
+        UvegGomb(ablak, "PDF export", self.pdf_export, accent=True, width=120).pack(anchor="e", padx=18, pady=(0, 18))
+
+    def projekt_kereses(self):
+        self.adatokat_osszegyujt()
+        ablak = tk.Toplevel(self); ablak.title("Projekt-szintű keresés"); ablak.geometry("740x500"); ablak.configure(bg=self.szinek["panel"]); ablak.transient(self)
+        ttk.Label(ablak, text="PROJEKT-SZINTŰ KERESÉS", style="AppTitle.TLabel").pack(anchor="w", padx=18, pady=(18, 8))
+        kereses = ttk.Entry(ablak, width=60); kereses.pack(fill="x", padx=18)
+        eredmeny = tk.Listbox(ablak, bg=self.szinek["szerkeszto"], fg=self.szinek["szoveg"], selectbackground=self.szinek["kiemeles"], selectforeground="#15191f", borderwidth=0, highlightthickness=0); eredmeny.pack(fill="both", expand=True, padx=18, pady=12)
+        talalatok = []
+        def keres():
+            szo = kereses.get().strip().lower(); eredmeny.delete(0, "end"); talalatok.clear()
+            if not szo: return
+            for i, jelenet in enumerate(self.projekt["jelenetek"]):
+                adat = " ".join([jelenet.get("fejlec", ""), jelenet.get("szoveg", ""), json.dumps(jelenet.get("kartya", {}), ensure_ascii=False), json.dumps(jelenet.get("bontas", {}), ensure_ascii=False)]).lower()
+                if szo in adat: talalatok.append(i); eredmeny.insert("end", f"{i + 1:02d}. {jelenet['fejlec']}  [{jelenet.get('statusz', 'Vázlat')}]")
+            for nev in self.projekt["karakterek"]:
+                if szo in nev.lower(): eredmeny.insert("end", f"Karakter: {nev}")
+            if not talalatok and eredmeny.size() == 0: eredmeny.insert("end", "Nincs találat.")
+        def megnyit(_e=None):
+            k = eredmeny.curselection()
+            if not k or k[0] >= len(talalatok): return
+            index = talalatok[k[0]]; self.jelenet_rogzit(); self.aktualis_jelenet = None; self.frissit_jelenetek(kijelolt=index); self.jelenet_kivalaszt(); ablak.destroy()
+        UvegGomb(ablak, "Keresés", keres, accent=True, width=100).pack(anchor="e", padx=18, pady=(0, 12)); eredmeny.bind("<Double-1>", megnyit); kereses.bind("<Return>", lambda _e: keres())
+
+    def projekt_ellenorzes(self):
+        self.adatokat_osszegyujt(); hibak, figyelmeztetesek = [], []
+        hasznalt_szoveg = "\n".join(j.get("szoveg", "") for j in self.projekt["jelenetek"]).lower()
+        for i, jelenet in enumerate(self.projekt["jelenetek"], 1):
+            if not jelenet.get("fejlec", "").strip(): hibak.append(f"{i}. jelenet: hiányzik a fejléc")
+            if not jelenet.get("szoveg", "").strip(): figyelmeztetesek.append(f"{i}. jelenet: üres jelenet")
+            if jelenet.get("statusz") not in ("Vázlat", "Írás alatt", "Javítás", "Kész"): figyelmeztetesek.append(f"{i}. jelenet: ismeretlen állapot")
+        for nev in self.projekt["karakterek"]:
+            if nev.lower() not in hasznalt_szoveg: figyelmeztetesek.append(f"Karakter nincs a jelenetszövegben: {nev}")
+        uzenet = "PROJEKTELLENŐRZÉS\n\n" + ("Hibák:\n• " + "\n• ".join(hibak) + "\n\n" if hibak else "Nincs kritikus hiba.\n\n") + ("Figyelmeztetések:\n• " + "\n• ".join(figyelmeztetesek) if figyelmeztetesek else "Nincs figyelmeztetés.")
+        messagebox.showwarning("Projekt ellenőrzése", uzenet) if hibak or figyelmeztetesek else messagebox.showinfo("Projekt ellenőrzése", uzenet)
+
     def karakterlap(self):
         k = self.karakter_lista.curselection()
         if not k:
@@ -1043,8 +1146,11 @@ class ForgatokonyvIro(tk.Tk):
         mezok = {}
         for kulcs, cim in (("osszefoglalo", "Rövid összefoglaló"), ("helyszin", "Helyszín"), ("ido", "Idő"), ("szereplok", "Szereplők"), ("dramaturgia", "Dramaturgiai szerep")):
             ttk.Label(ablak, text=cim).pack(anchor="w", padx=18); mezo = ttk.Entry(ablak, width=56); mezo.insert(0, kartya.get(kulcs, "")); mezo.pack(padx=18, pady=(2, 8)); mezok[kulcs] = mezo
+        ttk.Label(ablak, text="Jelenet állapota").pack(anchor="w", padx=18)
+        statusz = ttk.Combobox(ablak, values=("Vázlat", "Írás alatt", "Javítás", "Kész"), state="readonly", width=53)
+        statusz.set(jelenet.get("statusz", "Vázlat")); statusz.pack(padx=18, pady=(2, 8))
         def mentes():
-            jelenet["kartya"] = {kulcs: mezo.get().strip() for kulcs, mezo in mezok.items()}; ablak.destroy(); self.statusz.config(text="●  Jelenetkártya rögzítve")
+            jelenet["kartya"] = {kulcs: mezo.get().strip() for kulcs, mezo in mezok.items()}; jelenet["statusz"] = statusz.get(); self.frissit_jelenetek(kijelolt=self.aktualis_jelenet); ablak.destroy(); self.statusz.config(text="●  Jelenetkártya rögzítve")
         UvegGomb(ablak, "Jelenetkártya mentése", mentes, accent=True, width=190).pack(anchor="e", padx=18, pady=(2, 18))
 
     def auto_mentes(self):
@@ -1070,7 +1176,7 @@ class ForgatokonyvIro(tk.Tk):
             if messagebox.askyesno("Automatikus mentés", f"Találtam egy automatikus mentést:\n{adat['cim']}\n\nVisszaállítod?"):
                 self.projekt = adat
                 self.projekt.setdefault("verziok", []); self.projekt.setdefault("karakter_adatok", {}); self.projekt.setdefault("dramaturgia", []); self.projekt.setdefault("beatsheet", []); self.projekt.setdefault("kamera_beallitasok", [])
-                for jelenet in self.projekt["jelenetek"]: jelenet.setdefault("blokkok", {}); jelenet.setdefault("kartya", {}); jelenet.setdefault("bontas", {}); jelenet.setdefault("megjegyzesek", ""); jelenet.setdefault("kepek", [])
+                for jelenet in self.projekt["jelenetek"]: jelenet.setdefault("blokkok", {}); jelenet.setdefault("stilusok", {}); jelenet.setdefault("statusz", "Vázlat"); jelenet.setdefault("kartya", {}); jelenet.setdefault("bontas", {}); jelenet.setdefault("megjegyzesek", ""); jelenet.setdefault("kepek", [])
                 self.fajl_utvonal, self.aktualis_jelenet = None, None
                 self.cim.delete(0, "end"); self.cim.insert(0, adat["cim"])
                 self.szerzo.delete(0, "end"); self.szerzo.insert(0, adat.get("szerzo", ""))
