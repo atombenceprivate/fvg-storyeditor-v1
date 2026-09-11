@@ -6,6 +6,8 @@ Az FVG Story Editor összes jelentősebb változását ez a fájl tartalmazza.
 
 ### Hozzáadva
 
+- Önálló Node.js/React webes szerkesztő `.fvgscript` megnyitással, letöltéssel és helyi mentéssel.
+- Indításkori választó a desktop és a helyben futó webes felület között.
 - WYSIWYG eszköztár félkövér, dőlt, aláhúzott és igazított formázással; a formázás a projektben megmarad.
 - Jelenetállapotok: vázlat, írás alatt, javítás és kész.
 - Nyomtatási előnézet, projekt-szintű keresés és projektkonzisztencia-ellenőrzés.
