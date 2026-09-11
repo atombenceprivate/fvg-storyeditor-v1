@@ -2,6 +2,15 @@
 
 Az FVG Story Editor összes jelentősebb változását ez a fájl tartalmazza.
 
+## [0.2.0] - Következő kiadás
+
+### Hozzáadva
+
+- Idővonal, produkciós összesítő, referenciaképek és moodboard-kezelés.
+- Fountain- és Final Draft (`.fdx`) import.
+- Hunspell-alapú magyar helyesírás-ellenőrzési integráció.
+- GitHub Actions CI és automatikus Windows `.exe` kiadásépítés.
+
 ## [0.1.0] - 2026-09-11
 
 ### Hozzáadva
