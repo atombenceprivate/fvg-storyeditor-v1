@@ -1,0 +1,10 @@
+{
+  "name": "fvg-story-editor-web",
+  "version": "0.3.0",
+  "private": true,
+  "description": "FVG Story Editor önálló Node.js webes felülete",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  }
+}
