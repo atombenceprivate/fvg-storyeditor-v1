@@ -8,6 +8,12 @@ class ProjektAdatTeszt(unittest.TestCase):
         adat = ForgatokonyvIro.uj_projekt_adat()
         self.assertEqual(adat["napi_cel"], 500)
         self.assertEqual(adat["referenciak"], [])
+        self.assertEqual(adat["beatsheet"], [])
+        self.assertEqual(adat["kamera_beallitasok"], [])
+
+    def test_verzio_osszehasonlitas(self):
+        self.assertGreater(ForgatokonyvIro.verzio_kulcs("v0.2.1"), ForgatokonyvIro.verzio_kulcs("0.2.0"))
+        self.assertEqual(ForgatokonyvIro.verzio_kulcs("v1.0.0-beta"), (1, 0, 0))
 
     def test_fountain_import_jeleneteket_olvas(self):
         jelenetek = ForgatokonyvIro.fountain_jelenetek(
