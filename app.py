@@ -5,6 +5,8 @@ import traceback
 import importlib.util
 import tempfile
 import sys
+import csv
+import difflib
 from datetime import datetime
 from html import escape
 from pathlib import Path
@@ -71,12 +73,13 @@ class ForgatokonyvIro(tk.Tk):
         self.uj_projekt()
         self.after(350, self.indulasi_ellenorzes)
         self.after(180000, self.auto_mentes)
+        self.after(600, self.autosave_helyreallitas_felajanlasa)
         if len(sys.argv) > 1 and sys.argv[1]:
             self.after(120, lambda: self.megnyit_utvonal(sys.argv[1]))
 
     @staticmethod
     def uj_projekt_adat():
-        return {"cim": "Új forgatókönyv", "szerzo": "", "jelenetek": [], "karakterek": [], "karakter_adatok": {}, "verziok": []}
+        return {"cim": "Új forgatókönyv", "szerzo": "", "jelenetek": [], "karakterek": [], "karakter_adatok": {}, "verziok": [], "dramaturgia": [], "jegyzetek": "", "napi_cel": 500}
 
     def letrehoz_felulet(self):
         self.szinek = {
@@ -90,12 +93,15 @@ class ForgatokonyvIro(tk.Tk):
         menu = tk.Menu(self)
         fajl = tk.Menu(menu, tearoff=False)
         fajl.add_command(label="Új projekt", command=self.uj_projekt, accelerator="Ctrl+N")
+        fajl.add_command(label="Új projekt varázsló…", command=self.projekt_varazslo)
         fajl.add_command(label="Megnyitás…", command=self.megnyit, accelerator="Ctrl+O")
         fajl.add_command(label="Mentés", command=self.ment, accelerator="Ctrl+S")
         fajl.add_command(label="Mentés másként…", command=self.ment_maskent)
         fajl.add_separator()
         fajl.add_command(label="Verzióelőzmények…", command=self.verzio_elzmenyek, accelerator="Ctrl+H")
         fajl.add_command(label="Exportálás PDF-be…", command=self.pdf_export)
+        fajl.add_command(label="Exportálás Fountainbe…", command=self.fountain_export)
+        fajl.add_command(label="Exportcsomag készítése…", command=self.exportcsomag)
         fajl.add_separator()
         fajl.add_command(label="Kilépés", command=self.destroy)
         menu.add_cascade(label="Fájl", menu=fajl)
@@ -105,6 +111,16 @@ class ForgatokonyvIro(tk.Tk):
         eszkozok.add_separator()
         eszkozok.add_command(label="Karakterlap szerkesztése…", command=self.karakterlap)
         eszkozok.add_command(label="Aktuális jelenet kártyája…", command=self.jelenetkartya)
+        eszkozok.add_command(label="Jelenetkártya-tábla…", command=self.kartyatabla)
+        eszkozok.add_command(label="Dramaturgiai ív…", command=self.dramaturgiai_iv)
+        eszkozok.add_command(label="Projekt-navigátor…", command=self.navigator)
+        eszkozok.add_command(label="Dialóguselemzés…", command=self.dialogus_elemzes)
+        eszkozok.add_command(label="Jelenetjegyzetek…", command=self.jelenet_jegyzetek)
+        eszkozok.add_command(label="Produkciós bontás…", command=self.produkcios_bontas)
+        eszkozok.add_command(label="Verziók összehasonlítása…", command=self.verzio_osszehasonlitas)
+        eszkozok.add_separator()
+        eszkozok.add_command(label="Írási cél és fókuszmód…", command=self.cel_es_fokusz)
+        eszkozok.add_command(label="Aktuális jelenet duplikálása", command=self.jelenet_duplikalasa, accelerator="Ctrl+D")
         eszkozok.add_separator()
         eszkozok.add_command(label="Komponensek ellenőrzése", command=lambda: self.indulasi_ellenorzes(reszletes=True))
         menu.add_cascade(label="Eszközök", menu=eszkozok)
@@ -114,6 +130,7 @@ class ForgatokonyvIro(tk.Tk):
         self.bind_all("<Control-s>", lambda e: self.ment())
         self.bind_all("<Control-h>", lambda e: self.verzio_elzmenyek())
         self.bind_all("<Control-f>", lambda e: self.keres_es_csere())
+        self.bind_all("<Control-d>", lambda e: self.jelenet_duplikalasa())
 
         fejlec = ttk.Frame(self, style="Header.TFrame", padding=(22, 18, 22, 14))
         fejlec.pack(fill="x")
@@ -175,11 +192,16 @@ class ForgatokonyvIro(tk.Tk):
             highlightbackground=self.szinek["vonal"], highlightcolor=self.szinek["kiemeles"],
             font=("Sans", 12), spacing1=3, spacing3=5)
         self.szoveg.pack(fill="both", expand=True, pady=(4, 8))
+        self.szoveg.bind("<KeyRelease>", lambda _e: self.frissit_szamlalo())
         self.szoveg.tag_configure("Akció", justify="left", lmargin1=0, lmargin2=0, spacing1=7)
         self.szoveg.tag_configure("Karakter", justify="center", font=("Sans", 11, "bold"), foreground=self.szinek["kiemeles"], spacing1=12)
         self.szoveg.tag_configure("Párbeszéd", justify="left", lmargin1=70, lmargin2=70, rmargin=70, spacing3=7)
         self.szoveg.tag_configure("Zárójeles utasítás", justify="left", lmargin1=88, lmargin2=88, rmargin=88, foreground=self.szinek["halvany"])
-        UvegGomb(kozep, "Jelenet módosításainak rögzítése", self.jelenet_rogzit, accent=True, width=264).pack(anchor="e")
+        szerkeszto_also = ttk.Frame(kozep)
+        szerkeszto_also.pack(fill="x")
+        self.szamlalo = ttk.Label(szerkeszto_also, text="0 szó · 0 karakter", foreground=self.szinek["halvany"])
+        self.szamlalo.pack(side="left", pady=2)
+        UvegGomb(szerkeszto_also, "Jelenet módosításainak rögzítése", self.jelenet_rogzit, accent=True, width=264).pack(side="right")
 
         jobb = ttk.Labelframe(panel, text="Karakterek", padding=8)
         panel.add(jobb)
@@ -230,7 +252,7 @@ class ForgatokonyvIro(tk.Tk):
 
     def uj_jelenet(self):
         self.jelenet_rogzit()
-        self.projekt["jelenetek"].append({"fejlec": "INT. HELYSZÍN – NAPPAL", "szoveg": "", "blokkok": {}, "kartya": {}})
+        self.projekt["jelenetek"].append({"fejlec": "INT. HELYSZÍN – NAPPAL", "szoveg": "", "blokkok": {}, "kartya": {}, "bontas": {}, "megjegyzesek": ""})
         self.frissit_jelenetek()
         i = len(self.projekt["jelenetek"]) - 1
         self.jelenet_lista.selection_set(i); self.jelenet_kivalaszt()
@@ -244,6 +266,7 @@ class ForgatokonyvIro(tk.Tk):
         self.jelenet_fejlec.delete(0, "end"); self.jelenet_fejlec.insert(0, jelenet["fejlec"])
         self.szoveg.delete("1.0", "end"); self.szoveg.insert("1.0", jelenet["szoveg"])
         self.blokkok_rajzol(jelenet.get("blokkok", {}))
+        self.frissit_szamlalo()
 
     def jelenet_rogzit(self):
         if self.aktualis_jelenet is None: return
@@ -289,6 +312,21 @@ class ForgatokonyvIro(tk.Tk):
         del self.projekt["jelenetek"][self.aktualis_jelenet]
         self.aktualis_jelenet = None; self.frissit_jelenetek(); self.jelenet_mezo_tisztit()
 
+    def jelenet_duplikalasa(self):
+        if self.aktualis_jelenet is None:
+            messagebox.showinfo("Jelenet duplikálása", "Válassz ki egy jelenetet.")
+            return
+        self.jelenet_rogzit()
+        eredeti = self.projekt["jelenetek"][self.aktualis_jelenet]
+        masolat = json.loads(json.dumps(eredeti, ensure_ascii=False))
+        masolat["fejlec"] = f"{eredeti['fejlec']} (MÁSOLAT)"
+        uj_index = self.aktualis_jelenet + 1
+        self.projekt["jelenetek"].insert(uj_index, masolat)
+        self.aktualis_jelenet = None
+        self.frissit_jelenetek(kijelolt=uj_index)
+        self.jelenet_kivalaszt()
+        self.statusz.config(text="●  Jelenet duplikálva")
+
     def karakter_hozzaad(self):
         nev = simpledialog.askstring("Új karakter", "A karakter neve:", parent=self)
         if nev and nev.strip():
@@ -314,7 +352,10 @@ class ForgatokonyvIro(tk.Tk):
         for nev in self.projekt["karakterek"]: self.karakter_lista.insert("end", nev)
 
     def frissit_listak(self): self.frissit_jelenetek(); self.frissit_karakterek()
-    def jelenet_mezo_tisztit(self): self.jelenet_fejlec.delete(0, "end"); self.szoveg.delete("1.0", "end")
+    def jelenet_mezo_tisztit(self): self.jelenet_fejlec.delete(0, "end"); self.szoveg.delete("1.0", "end"); self.frissit_szamlalo()
+    def frissit_szamlalo(self):
+        szoveg = self.szoveg.get("1.0", "end-1c")
+        self.szamlalo.config(text=f"{len(szoveg.split())} szó · {len(szoveg)} karakter")
     def adatokat_osszegyujt(self):
         self.jelenet_rogzit(); self.projekt["cim"] = self.cim.get().strip() or "Új forgatókönyv"; self.projekt["szerzo"] = self.szerzo.get().strip()
 
@@ -322,7 +363,7 @@ class ForgatokonyvIro(tk.Tk):
         """Elmenti a projekt aktuális állapotát egy visszaállítható változatként."""
         adat = {
             "cim": self.projekt["cim"], "szerzo": self.projekt["szerzo"],
-            "jelenetek": self.projekt["jelenetek"], "karakterek": self.projekt["karakterek"], "karakter_adatok": self.projekt.get("karakter_adatok", {}),
+            "jelenetek": self.projekt["jelenetek"], "karakterek": self.projekt["karakterek"], "karakter_adatok": self.projekt.get("karakter_adatok", {}), "dramaturgia": self.projekt.get("dramaturgia", []), "jegyzetek": self.projekt.get("jegyzetek", ""), "napi_cel": self.projekt.get("napi_cel", 500),
         }
         # JSON-körrel mély másolat készül, így a régi változat nem módosul később.
         masolat = json.loads(json.dumps(adat, ensure_ascii=False))
@@ -355,9 +396,14 @@ class ForgatokonyvIro(tk.Tk):
             if not all(k in adat for k in ("cim", "szerzo", "jelenetek", "karakterek")): raise ValueError("Ez nem érvényes FVG Story Editor projekt.")
             adat.setdefault("verziok", [])
             adat.setdefault("karakter_adatok", {})
+            adat.setdefault("dramaturgia", [])
+            adat.setdefault("jegyzetek", "")
+            adat.setdefault("napi_cel", 500)
             for jelenet in adat["jelenetek"]:
                 jelenet.setdefault("blokkok", {})
                 jelenet.setdefault("kartya", {})
+                jelenet.setdefault("bontas", {})
+                jelenet.setdefault("megjegyzesek", "")
             self.projekt, self.fajl_utvonal, self.aktualis_jelenet = adat, utvonal, None
             self.cim.delete(0, "end"); self.cim.insert(0, adat["cim"])
             self.szerzo.delete(0, "end"); self.szerzo.insert(0, adat["szerzo"])
@@ -410,6 +456,140 @@ class ForgatokonyvIro(tk.Tk):
             messagebox.showinfo("PDF export", f"Elkészült a PDF:\n{utvonal}")
         except OSError as hiba:
             messagebox.showerror("PDF export", str(hiba))
+
+    def fountain_export(self):
+        """Egyszerű Fountain-szöveg export, kompatibilis számos forgatókönyvíróval."""
+        self.adatokat_osszegyujt()
+        utvonal = filedialog.asksaveasfilename(defaultextension=".fountain", initialfile=f"{self.projekt['cim']}.fountain", filetypes=[("Fountain forgatókönyv", "*.fountain"), ("Szövegfájl", "*.txt")])
+        if not utvonal:
+            return
+        try:
+            Path(utvonal).write_text(self.fountain_tartalom(), encoding="utf-8")
+            self.statusz.config(text=f"●  Fountain export elkészült: {Path(utvonal).name}")
+            messagebox.showinfo("Fountain export", f"Elkészült:\n{utvonal}")
+        except OSError as hiba:
+            messagebox.showerror("Fountain export", str(hiba))
+
+    def fountain_tartalom(self):
+        sorok = [f"Title: {self.projekt['cim']}", f"Author: {self.projekt['szerzo']}", ""]
+        for jelenet in self.projekt["jelenetek"]:
+            sorok.extend([jelenet["fejlec"], ""])
+            blokkok = jelenet.get("blokkok", {})
+            for sorszam, sor in enumerate(jelenet["szoveg"].splitlines(), 1):
+                tipus = blokkok.get(str(sorszam), "Akció")
+                if tipus == "Karakter": sor = sor.upper()
+                elif tipus == "Zárójeles utasítás" and sor and not sor.startswith("("): sor = f"({sor})"
+                sorok.append(sor)
+            sorok.append("")
+        return "\n".join(sorok)
+
+    def projekt_varazslo(self):
+        ablak = tk.Toplevel(self); ablak.title("Új projekt varázsló"); ablak.configure(bg=self.szinek["panel"]); ablak.transient(self)
+        ttk.Label(ablak, text="ÚJ PROJEKT", style="AppTitle.TLabel").pack(anchor="w", padx=20, pady=(20, 4))
+        ttk.Label(ablak, text="Válassz kiinduló sablont, majd nevezd el a történetet.").pack(anchor="w", padx=20, pady=(0, 14))
+        ttk.Label(ablak, text="Projektcím").pack(anchor="w", padx=20); cim = ttk.Entry(ablak, width=45); cim.pack(padx=20, pady=(2, 10)); cim.focus_set()
+        ttk.Label(ablak, text="Szerző").pack(anchor="w", padx=20); szerzo = ttk.Entry(ablak, width=45); szerzo.pack(padx=20, pady=(2, 10))
+        ttk.Label(ablak, text="Sablon").pack(anchor="w", padx=20); sablon = tk.StringVar(value="Játékfilm"); ttk.Combobox(ablak, textvariable=sablon, state="readonly", values=("Játékfilm", "Rövidfilm", "Sorozatepizód", "Üres projekt"), width=42).pack(padx=20, pady=(2, 16))
+        def letrehoz():
+            if self.projekt["jelenetek"] and not messagebox.askyesno("Új projekt", "A jelenlegi projekt nem mentett részei elveszhetnek. Folytatod?", parent=ablak): return
+            self.projekt = self.uj_projekt_adat(); self.projekt["cim"] = cim.get().strip() or "Új forgatókönyv"; self.projekt["szerzo"] = szerzo.get().strip(); self.fajl_utvonal = None; self.aktualis_jelenet = None
+            if sablon.get() != "Üres projekt":
+                kezd = "INT. HELYSZÍN – NAPPAL" if sablon.get() != "Sorozatepizód" else "TEASER"
+                self.projekt["jelenetek"].append({"fejlec": kezd, "szoveg": "", "blokkok": {}, "kartya": {}, "bontas": {}, "megjegyzesek": ""})
+            self.cim.delete(0, "end"); self.cim.insert(0, self.projekt["cim"]); self.szerzo.delete(0, "end"); self.szerzo.insert(0, self.projekt["szerzo"]); self.frissit_listak(); self.jelenet_mezo_tisztit(); ablak.destroy(); self.statusz.config(text=f"●  Új projekt: {sablon.get()} sablon")
+        UvegGomb(ablak, "Projekt létrehozása", letrehoz, accent=True, width=170).pack(anchor="e", padx=20, pady=(0, 20))
+
+    def navigator(self):
+        ablak = tk.Toplevel(self); ablak.title("Projekt-navigátor"); ablak.geometry("530x500"); ablak.configure(bg=self.szinek["panel"]); ablak.transient(self)
+        fa = ttk.Treeview(ablak, show="tree", selectmode="browse"); fa.pack(fill="both", expand=True, padx=16, pady=16)
+        jelenetek = fa.insert("", "end", text="Jelenetek", open=True)
+        for i, jelenet in enumerate(self.projekt["jelenetek"]): fa.insert(jelenetek, "end", iid=f"j:{i}", text=f"{i + 1:02d}. {jelenet['fejlec']}")
+        karakterek = fa.insert("", "end", text="Karakterek", open=True)
+        for nev in self.projekt["karakterek"]: fa.insert(karakterek, "end", text=nev)
+        dramaturgia = fa.insert("", "end", text="Dramaturgiai ív", open=True)
+        for pont in self.projekt.get("dramaturgia", []): fa.insert(dramaturgia, "end", text=f"{pont['nev']}: {pont.get('jelenet') or '—'}")
+        def ugrik(_e):
+            azonosito = fa.selection()
+            if azonosito and azonosito[0].startswith("j:"):
+                index = int(azonosito[0][2:]); self.jelenet_rogzit(); self.aktualis_jelenet = None; self.frissit_jelenetek(kijelolt=index); self.jelenet_kivalaszt(); ablak.destroy()
+        fa.bind("<Double-1>", ugrik)
+
+    def dialogus_elemzes(self):
+        self.adatokat_osszegyujt(); adatok = {}
+        for jelenet in self.projekt["jelenetek"]:
+            aktualis = "NÉVTELEN"
+            for sorszam, sor in enumerate(jelenet["szoveg"].splitlines(), 1):
+                tipus = jelenet.get("blokkok", {}).get(str(sorszam), "Akció")
+                if tipus == "Karakter": aktualis = sor.strip().upper() or "NÉVTELEN"
+                elif tipus == "Párbeszéd":
+                    adatok[aktualis] = adatok.get(aktualis, 0) + len(sor.split())
+        rendezett = sorted(adatok.items(), key=lambda x: x[1], reverse=True)
+        szoveg = "\n".join(f"{nev}: {szavak} szó" for nev, szavak in rendezett) or "Még nincs formázott párbeszédblokk."
+        messagebox.showinfo("Dialóguselemzés", f"KARAKTERENKÉNTI DIALÓGUS\n\n{szoveg}")
+
+    def jelenet_jegyzetek(self):
+        if self.aktualis_jelenet is None: messagebox.showinfo("Jelenetjegyzetek", "Válassz ki egy jelenetet."); return
+        jelenet = self.projekt["jelenetek"][self.aktualis_jelenet]; ablak = tk.Toplevel(self); ablak.title("Jelenetjegyzetek"); ablak.configure(bg=self.szinek["panel"]); ablak.transient(self)
+        ttk.Label(ablak, text="JELENETJEGYZETEK", style="AppTitle.TLabel").pack(anchor="w", padx=18, pady=(18, 8))
+        mezo = tk.Text(ablak, width=62, height=17, bg=self.szinek["szerkeszto"], fg=self.szinek["szoveg"], insertbackground=self.szinek["kiemeles"], relief="flat"); mezo.insert("1.0", jelenet.get("megjegyzesek", "")); mezo.pack(padx=18, pady=(0, 12))
+        def mentes(): jelenet["megjegyzesek"] = mezo.get("1.0", "end-1c"); ablak.destroy(); self.statusz.config(text="●  Jelenetjegyzetek mentve")
+        UvegGomb(ablak, "Jegyzetek mentése", mentes, accent=True, width=150).pack(anchor="e", padx=18, pady=(0, 18))
+
+    def produkcios_bontas(self):
+        if self.aktualis_jelenet is None: messagebox.showinfo("Produkciós bontás", "Válassz ki egy jelenetet."); return
+        jelenet = self.projekt["jelenetek"][self.aktualis_jelenet]; bontas = jelenet.setdefault("bontas", {})
+        ablak = tk.Toplevel(self); ablak.title("Produkciós bontás"); ablak.configure(bg=self.szinek["panel"]); ablak.transient(self)
+        ttk.Label(ablak, text="PRODUKCIÓS BONTÁS", style="AppTitle.TLabel").pack(anchor="w", padx=18, pady=(18, 4))
+        ttk.Label(ablak, text="Vesszővel elválasztott lista is megadható.").pack(anchor="w", padx=18, pady=(0, 10))
+        mezok = {}
+        for kulcs, cim in (("helyszin", "Helyszín"), ("szereplok", "Szereplők"), ("kellekek", "Kellékek"), ("jelmezek", "Jelmezek"), ("hang", "Hang / zene"), ("megjegyzes", "Produkciós megjegyzés")):
+            ttk.Label(ablak, text=cim).pack(anchor="w", padx=18); mezo = ttk.Entry(ablak, width=60); mezo.insert(0, bontas.get(kulcs, "")); mezo.pack(padx=18, pady=(2, 7)); mezok[kulcs] = mezo
+        def mentes(): jelenet["bontas"] = {k: m.get().strip() for k, m in mezok.items()}; ablak.destroy(); self.statusz.config(text="●  Produkciós bontás mentve")
+        UvegGomb(ablak, "Bontás mentése", mentes, accent=True, width=140).pack(anchor="e", padx=18, pady=(3, 18))
+
+    def verzio_osszehasonlitas(self):
+        self.adatokat_osszegyujt(); verziok = self.projekt.get("verziok", [])
+        if not verziok: messagebox.showinfo("Verziók összehasonlítása", "Mentsd el a projektet legalább egyszer."); return
+        ablak = tk.Toplevel(self); ablak.title("Verziók összehasonlítása"); ablak.geometry("820x570"); ablak.configure(bg=self.szinek["panel"]); ablak.transient(self)
+        ttk.Label(ablak, text="VERZIÓ-ÖSSZEHASONLÍTÁS", style="AppTitle.TLabel").pack(anchor="w", padx=18, pady=(18, 8))
+        valasztas = tk.StringVar(); cimkek = [f"{v['ido']} · {v['adat']['cim']}" for v in reversed(verziok)]
+        ttk.Combobox(ablak, textvariable=valasztas, values=cimkek, state="readonly", width=76).pack(padx=18, fill="x")
+        nezet = tk.Text(ablak, wrap="none", bg=self.szinek["szerkeszto"], fg=self.szinek["szoveg"], insertbackground=self.szinek["kiemeles"], relief="flat", font=("Courier", 10)); nezet.pack(fill="both", expand=True, padx=18, pady=12)
+        def osszevet():
+            if not valasztas.get(): return
+            index = cimkek.index(valasztas.get()); regi = verziok[len(verziok) - 1 - index]["adat"]
+            most = {"cim": self.projekt["cim"], "szerzo": self.projekt["szerzo"], "jelenetek": self.projekt["jelenetek"], "karakterek": self.projekt["karakterek"], "karakter_adatok": self.projekt.get("karakter_adatok", {}), "dramaturgia": self.projekt.get("dramaturgia", [])}
+            diff = difflib.unified_diff(json.dumps(regi, ensure_ascii=False, indent=2).splitlines(), json.dumps(most, ensure_ascii=False, indent=2).splitlines(), fromfile="kiválasztott változat", tofile="jelenlegi állapot", lineterm="")
+            nezet.delete("1.0", "end"); nezet.insert("1.0", "\n".join(diff) or "Nincs különbség.")
+        UvegGomb(ablak, "Összehasonlítás", osszevet, accent=True, width=145).pack(anchor="e", padx=18, pady=(0, 18))
+
+    def cel_es_fokusz(self):
+        ablak = tk.Toplevel(self); ablak.title("Írási cél és fókuszmód"); ablak.configure(bg=self.szinek["panel"]); ablak.transient(self)
+        ttk.Label(ablak, text="ÍRÁSI CÉL", style="AppTitle.TLabel").pack(anchor="w", padx=18, pady=(18, 8))
+        ttk.Label(ablak, text="Napi szócél:").pack(anchor="w", padx=18); cel = tk.IntVar(value=self.projekt.get("napi_cel", 500)); ttk.Spinbox(ablak, from_=50, to=10000, increment=50, textvariable=cel, width=12).pack(anchor="w", padx=18, pady=(3, 10))
+        fokusz = tk.BooleanVar(value=False); ttk.Checkbutton(ablak, text="Fókuszmód bekapcsolása (teljes képernyő)", variable=fokusz).pack(anchor="w", padx=18, pady=(0, 14))
+        def alkalmaz():
+            self.projekt["napi_cel"] = cel.get(); self.attributes("-fullscreen", fokusz.get()); self.bind("<Escape>", lambda _e: self.attributes("-fullscreen", False)); ablak.destroy()
+            osszes = sum(len(j["szoveg"].split()) for j in self.projekt["jelenetek"]); self.statusz.config(text=f"●  Írási cél: {osszes}/{cel.get()} szó")
+        UvegGomb(ablak, "Alkalmazás", alkalmaz, accent=True, width=110).pack(anchor="e", padx=18, pady=(0, 18))
+
+    def exportcsomag(self):
+        self.adatokat_osszegyujt(); cel = filedialog.askdirectory(title="Exportcsomag mappája")
+        if not cel: return
+        try:
+            mappa = Path(cel); alap = "fvg-storyeditor-export"
+            (mappa / f"{alap}.fountain").write_text(self.fountain_tartalom(), encoding="utf-8")
+            (mappa / f"{alap}.fvgscript").write_text(json.dumps(self.projekt, ensure_ascii=False, indent=2), encoding="utf-8")
+            with (mappa / f"{alap}-jelenetek.csv").open("w", newline="", encoding="utf-8") as fajl:
+                iro = csv.writer(fajl); iro.writerow(["Sorszám", "Fejléc", "Helyszín", "Idő", "Dramaturgia", "Szereplők", "Kellékek", "Jelmezek", "Hang / zene"])
+                for i, j in enumerate(self.projekt["jelenetek"], 1):
+                    k, b = j.get("kartya", {}), j.get("bontas", {})
+                    iro.writerow([i, j["fejlec"], b.get("helyszin", k.get("helyszin", "")), k.get("ido", ""), k.get("dramaturgia", ""), b.get("szereplok", ""), b.get("kellekek", ""), b.get("jelmezek", ""), b.get("hang", "")])
+            with (mappa / f"{alap}-karakterek.csv").open("w", newline="", encoding="utf-8") as fajl:
+                iro = csv.writer(fajl); iro.writerow(["Név", "Leírás", "Cél", "Konfliktus"])
+                for nev in self.projekt["karakterek"]: k = self.projekt.get("karakter_adatok", {}).get(nev, {}); iro.writerow([nev, k.get("leiras", ""), k.get("cel", ""), k.get("konfliktus", "")])
+            self.statusz.config(text=f"●  Exportcsomag elkészült: {mappa}"); messagebox.showinfo("Exportcsomag", f"Elkészült 4 fájl:\n{mappa}")
+        except OSError as hiba: messagebox.showerror("Exportcsomag", str(hiba))
 
     def keres_es_csere(self):
         self.adatokat_osszegyujt()
@@ -486,6 +666,68 @@ class ForgatokonyvIro(tk.Tk):
         finally:
             self.after(180000, self.auto_mentes)
 
+    def autosave_helyreallitas_felajanlasa(self):
+        """Egy korábbi, névtelen projekt automatikus mentését felajánlja induláskor."""
+        cel = Path.cwd() / "fvg-storyeditor.autosave.json"
+        if not cel.exists():
+            return
+        try:
+            adat = json.loads(cel.read_text(encoding="utf-8"))
+            if not all(k in adat for k in ("cim", "jelenetek", "karakterek")):
+                return
+            if messagebox.askyesno("Automatikus mentés", f"Találtam egy automatikus mentést:\n{adat['cim']}\n\nVisszaállítod?"):
+                self.projekt = adat
+                self.projekt.setdefault("verziok", []); self.projekt.setdefault("karakter_adatok", {}); self.projekt.setdefault("dramaturgia", [])
+                for jelenet in self.projekt["jelenetek"]: jelenet.setdefault("blokkok", {}); jelenet.setdefault("kartya", {}); jelenet.setdefault("bontas", {}); jelenet.setdefault("megjegyzesek", "")
+                self.fajl_utvonal, self.aktualis_jelenet = None, None
+                self.cim.delete(0, "end"); self.cim.insert(0, adat["cim"])
+                self.szerzo.delete(0, "end"); self.szerzo.insert(0, adat.get("szerzo", ""))
+                self.frissit_listak(); self.jelenet_mezo_tisztit()
+                self.statusz.config(text="●  Automatikus mentés visszaállítva — mentsd el projektként.")
+        except (OSError, ValueError, json.JSONDecodeError):
+            return
+
+    def kartyatabla(self):
+        self.adatokat_osszegyujt()
+        ablak = tk.Toplevel(self); ablak.title("Jelenetkártya-tábla — FVG Story Editor"); ablak.geometry("900x620"); ablak.configure(bg=self.szinek["hatterszin"]); ablak.transient(self)
+        ttk.Label(ablak, text="JELENETKÁRTYA-TÁBLA", style="AppTitle.TLabel").pack(anchor="w", padx=20, pady=(18, 3))
+        ttk.Label(ablak, text="Kattints egy kártyára a jelenet megnyitásához.", style="Tagline.TLabel").pack(anchor="w", padx=20, pady=(0, 12))
+        vaszon = tk.Canvas(ablak, bg=self.szinek["hatterszin"], highlightthickness=0)
+        gorgeto = ttk.Scrollbar(ablak, orient="vertical", command=vaszon.yview); vaszon.configure(yscrollcommand=gorgeto.set)
+        gorgeto.pack(side="right", fill="y"); vaszon.pack(fill="both", expand=True, padx=(20, 5), pady=(0, 20))
+        belso = tk.Frame(vaszon, bg=self.szinek["hatterszin"]); vaszon.create_window((0, 0), window=belso, anchor="nw")
+        belso.bind("<Configure>", lambda _e: vaszon.configure(scrollregion=vaszon.bbox("all")))
+        def megnyit(index):
+            self.jelenet_rogzit(); self.aktualis_jelenet = None; self.frissit_jelenetek(kijelolt=index); self.jelenet_kivalaszt(); ablak.destroy()
+        for i, jelenet in enumerate(self.projekt["jelenetek"]):
+            kartya = jelenet.get("kartya", {}); panel = tk.Frame(belso, bg=self.szinek["panel_vilagos"], highlightbackground=self.szinek["vonal"], highlightthickness=1, padx=14, pady=12, cursor="hand2")
+            panel.grid(row=i // 3, column=i % 3, padx=7, pady=7, sticky="nsew")
+            ttk.Label(panel, text=f"{i + 1:02d}  {jelenet['fejlec']}", foreground=self.szinek["kiemeles"], wraplength=230, font=("Sans", 9, "bold")).pack(anchor="w")
+            ttk.Label(panel, text=kartya.get("osszefoglalo") or "Nincs összefoglaló.", wraplength=230, justify="left").pack(anchor="w", pady=(8, 5))
+            ttk.Label(panel, text=" · ".join(x for x in (kartya.get("helyszin"), kartya.get("dramaturgia")) if x) or "Jelenetkártya szerkesztése", foreground=self.szinek["halvany"], wraplength=230).pack(anchor="w")
+            for elem in (panel, *panel.winfo_children()): elem.bind("<Button-1>", lambda _e, index=i: megnyit(index))
+        for oszlop in range(3): belso.grid_columnconfigure(oszlop, weight=1)
+
+    def dramaturgiai_iv(self):
+        self.adatokat_osszegyujt()
+        alap = ["Nyitókép", "Kiváltó esemény", "Első fordulópont", "Középpont", "Mélypont", "Finálé"]
+        iv = self.projekt.setdefault("dramaturgia", [])
+        while len(iv) < len(alap): iv.append({"nev": alap[len(iv)], "jelenet": "", "jegyzet": ""})
+        ablak = tk.Toplevel(self); ablak.title("Dramaturgiai ív — FVG Story Editor"); ablak.geometry("650x560"); ablak.configure(bg=self.szinek["panel"]); ablak.transient(self)
+        ttk.Label(ablak, text="DRAMATURGIAI ÍV", style="AppTitle.TLabel").pack(anchor="w", padx=18, pady=(18, 3))
+        ttk.Label(ablak, text="A történet fő fordulópontjai és a hozzájuk tartozó jelenetek.").pack(anchor="w", padx=18, pady=(0, 12))
+        tartalom = ttk.Frame(ablak); tartalom.pack(fill="both", expand=True, padx=18)
+        jelenet_nevek = [j["fejlec"] for j in self.projekt["jelenetek"]]
+        mezok = []
+        for i, pont in enumerate(iv):
+            sor = ttk.Labelframe(tartalom, text=pont["nev"], padding=8); sor.pack(fill="x", pady=4)
+            valasztas = tk.StringVar(value=pont.get("jelenet", "")); ttk.Combobox(sor, textvariable=valasztas, values=jelenet_nevek, state="readonly", width=42).pack(fill="x")
+            jegyzet = ttk.Entry(sor); jegyzet.insert(0, pont.get("jegyzet", "")); jegyzet.pack(fill="x", pady=(5, 0)); mezok.append((valasztas, jegyzet))
+        def mentes():
+            self.projekt["dramaturgia"] = [{"nev": alap[i], "jelenet": v.get(), "jegyzet": j.get().strip()} for i, (v, j) in enumerate(mezok)]
+            ablak.destroy(); self.statusz.config(text="●  Dramaturgiai ív rögzítve")
+        UvegGomb(ablak, "Dramaturgiai ív mentése", mentes, accent=True, width=190).pack(anchor="e", padx=18, pady=18)
+
     def indulasi_ellenorzes(self, reszletes=False):
         hibak = []
         if importlib.util.find_spec("reportlab") is None: hibak.append("PDF-export: ReportLab nincs telepítve")
@@ -534,6 +776,9 @@ class ForgatokonyvIro(tk.Tk):
             self.projekt["jelenetek"] = json.loads(json.dumps(valasztott["jelenetek"]))
             self.projekt["karakterek"] = json.loads(json.dumps(valasztott["karakterek"]))
             self.projekt["karakter_adatok"] = json.loads(json.dumps(valasztott.get("karakter_adatok", {})))
+            self.projekt["dramaturgia"] = json.loads(json.dumps(valasztott.get("dramaturgia", [])))
+            self.projekt["jegyzetek"] = valasztott.get("jegyzetek", "")
+            self.projekt["napi_cel"] = valasztott.get("napi_cel", 500)
             self.aktualis_jelenet = None
             self.cim.delete(0, "end"); self.cim.insert(0, self.projekt["cim"])
             self.szerzo.delete(0, "end"); self.szerzo.insert(0, self.projekt["szerzo"])
@@ -549,14 +794,17 @@ if __name__ == "__main__":
     except Exception as hiba:
         # A .desktop indítás nem mutat terminált; a napló segít, ha a hiba
         # a grafikus párbeszédablak előtt következne be.
-        Path(__file__).with_name("inditasi_hiba.log").write_text(
-            traceback.format_exc(), encoding="utf-8"
-        )
+        naplo = Path(__file__).with_name("inditasi_hiba.log")
+        try:
+            naplo.write_text(traceback.format_exc(), encoding="utf-8")
+        except OSError:
+            naplo = Path(tempfile.gettempdir()) / "fvg-story-editor-inditasi-hiba.log"
+            naplo.write_text(traceback.format_exc(), encoding="utf-8")
         try:
             messagebox.showerror(
                 "FVG Story Editor – indítási hiba",
                 f"Az alkalmazás nem tudott elindulni.\n\n{hiba}\n\n"
-                "A részletek az inditasi_hiba.log fájlban vannak.",
+                f"A részletek itt vannak: {naplo}",
             )
         except tk.TclError:
             pass
