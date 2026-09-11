@@ -13,6 +13,7 @@ import platform
 import threading
 import urllib.request
 import webbrowser
+import shutil
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from html import escape
@@ -24,6 +25,7 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 APP_VERZIO = "0.2.0"
 GITHUB_TARHELY = "atombenceprivate/fvg-storyeditor-v1"
 GITHUB_KIADAS_API = f"https://api.github.com/repos/{GITHUB_TARHELY}/releases/latest"
+WEBAPP_MAPPANEVE = "web-app"
 
 SZOVEGEK = {
     "hu": {
@@ -168,6 +170,7 @@ class ForgatokonyvIro(tk.Tk):
         self.after(350, self.indulasi_ellenorzes)
         self.after(180000, self.auto_mentes)
         self.after(600, self.autosave_helyreallitas_felajanlasa)
+        self.after(900, self.inditasi_mod_valaszto)
         self.after(1800, self.frissites_ellenorzese_hatterben)
         if len(sys.argv) > 1 and sys.argv[1]:
             self.after(120, lambda: self.megnyit_utvonal(sys.argv[1]))
@@ -196,6 +199,24 @@ class ForgatokonyvIro(tk.Tk):
             cel.write_text(json.dumps(self.beallitasok, ensure_ascii=False, indent=2), encoding="utf-8")
         except OSError:
             pass
+
+    def inditasi_mod_valaszto(self):
+        """Induláskor választható a natív vagy a helyi Node.js webes felület."""
+        if messagebox.askyesno("FVG Story Editor", "A webes felületet szeretnéd megnyitni?\n\nIgen: webes szerkesztő\nNem: asztali alkalmazás"):
+            self.webes_felulet_inditasa()
+
+    def webes_felulet_inditasa(self):
+        mappa = Path(__file__).resolve().parent / WEBAPP_MAPPANEVE
+        node = shutil.which("node")
+        if not mappa.is_dir() or not node:
+            messagebox.showwarning("Webes felület", "A webes felülethez szükség van a projekt web-app mappájára és a Node.js-re.")
+            return
+        try:
+            subprocess.Popen([node, "server.mjs"], cwd=mappa, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self.after(700, lambda: webbrowser.open("http://127.0.0.1:4173"))
+            self.statusz.config(text="●  Webes felület indítása folyamatban")
+        except OSError as hiba:
+            messagebox.showerror("Webes felület", str(hiba))
 
     def letrehoz_felulet(self):
         self.szinek = {
