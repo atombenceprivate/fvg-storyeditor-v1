@@ -6,6 +6,10 @@ Az alkalmazás Beat Sheetet és jelenethez kötött kamera-beállítási listát
 
 A v0.3 szerkesztői eszközei közé tartozik a WYSIWYG félkövér/dőlt/aláhúzott és igazító formázás, a jelenetállapotok, a nyomtatási előnézet, a projektszintű keresés és ellenőrzés, valamint a tíz időbélyeges automatikus mentést kezelő helyreállítási nézet. Az exportcsomag Beat Sheet- és shot-list CSV-t is tartalmaz.
 
+## Webes felület
+
+A `web-app` önálló Node.js alkalmazás. A desktop alkalmazás induláskor felajánlja a megnyitását; ehhez Node.js szükséges. A webes szerkesztő a böngészőben, helyben fut, `.fvgscript` fájlokat nyit meg és ment le, valamint helyi böngészőmentést is készít.
+
 Licenc: [MIT](LICENSE). A kiadási változások a [CHANGELOG.md](CHANGELOG.md) fájlban találhatók.
 
 ## Funkciók
