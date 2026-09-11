@@ -5,3 +5,4 @@ inditasi_hiba.log
 *.autosave.json
 output/
 tmp/
+dist/*.deb
