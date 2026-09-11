@@ -6,3 +6,11 @@ inditasi_hiba.log
 output/
 tmp/
 dist/*.deb
+web-app/node_modules/
+web-app/*.log
+./.agents
+./.codex
+./.git
+./.github
+./.github/workflows
+./
