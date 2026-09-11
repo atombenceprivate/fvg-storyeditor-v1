@@ -28,7 +28,7 @@ jobs:
         shell: pwsh
         run: |
           choco install nsis -y --no-progress
-          makensis installer\fvg-story-editor.nsi
+          & "${env:ProgramFiles(x86)}\NSIS\makensis.exe" installer\fvg-story-editor.nsi
       - name: Windows alkalmazás mentése
         uses: actions/upload-artifact@v4
         with:
