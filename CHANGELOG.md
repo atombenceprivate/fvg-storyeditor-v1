@@ -6,6 +6,11 @@ Az FVG Story Editor összes jelentősebb változását ez a fájl tartalmazza.
 
 ### Hozzáadva
 
+- WYSIWYG eszköztár félkövér, dőlt, aláhúzott és igazított formázással; a formázás a projektben megmarad.
+- Jelenetállapotok: vázlat, írás alatt, javítás és kész.
+- Nyomtatási előnézet, projekt-szintű keresés és projektkonzisztencia-ellenőrzés.
+- Időbélyeges automatikus mentési előzmények (az utolsó tíz projektmentés visszaállítható).
+- Beat Sheet- és kamera-beállítási lista CSV export az exportcsomagban.
 - Beat Sheet a történet fordulópontjainak sorrendezhető listájával.
 - Jelenethez köthető kamera-beállítási lista képkivágással, mozgással és technikai jegyzetekkel.
 - Magyar és angol alkalmazásnyelv-választó.
