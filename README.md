@@ -2,6 +2,8 @@
 
 Magyar nyelvű, Python/Tkinter alapú asztali forgatókönyvíró prototípus. A natív projektformátum a `.fvgscript` (UTF-8-as JSON); minden mentés automatikusan visszaállítható verziót készít (legfeljebb 30 változat).
 
+Licenc: [MIT](LICENSE). A kiadási változások a [CHANGELOG.md](CHANGELOG.md) fájlban találhatók.
+
 ## Funkciók
 
 - jelenet-, karakter- és jelenetkártya-kezelés;
@@ -12,6 +14,8 @@ Magyar nyelvű, Python/Tkinter alapú asztali forgatókönyvíró prototípus. A
 - jelenetkártya-tábla, dramaturgiai ív és induláskori autosave-visszaállítás;
 - projektvarázsló, navigátor, dialóguselemzés, fókuszmód, jelenetjegyzetek és exportcsomag.
 - produkciós bontás és mentett változatok közötti szöveges összehasonlítás.
+- jelenetek fogd-és-ejtsd átrendezése és projekt-specifikus autosave-visszaállítás.
+- idővonal, produkciós összesítő, Fountain/FDX-import, referenciaképek és Hunspell-integráció.
 
 ## Ubuntu/Debian csomag
 
@@ -26,6 +30,8 @@ A csomag a `dist/fvg-story-editor_0.1.0_all.deb` útvonalon jön létre, telepí
 ## Automatikus GitHub kiadás
 
 A `.github/workflows/release.yml` GitHub Actions munkafolyamat minden `v*` címkénél automatikusan elkészíti a `.deb` csomagot és GitHub Release-ként közzéteszi.
+
+Ugyanez a kiadásfolyamat elkészíti a Windowsos önálló `FVGStoryEditor.exe` fájlt is. A `.github/workflows/ci.yml` minden `main` feltöltésnél és pull requestnél futtatja a szintaxis- és egységteszteket.
 - automatikus mentés hárompercenként;
 - verzióelőzmények és PDF-export;
 - induláskori komponensellenőrzés (Tkinter, ideiglenes fájlkezelés, ReportLab).
