@@ -11,6 +11,11 @@ class ProjektAdatTeszt(unittest.TestCase):
         self.assertEqual(adat["beatsheet"], [])
         self.assertEqual(adat["kamera_beallitasok"], [])
 
+    def test_uj_jelenet_v3_adatokkal_indul(self):
+        jelenet = ForgatokonyvIro.uj_jelenet_adat()
+        self.assertEqual(jelenet["statusz"], "Vázlat")
+        self.assertEqual(jelenet["stilusok"], {})
+
     def test_verzio_osszehasonlitas(self):
         self.assertGreater(ForgatokonyvIro.verzio_kulcs("v0.2.1"), ForgatokonyvIro.verzio_kulcs("0.2.0"))
         self.assertEqual(ForgatokonyvIro.verzio_kulcs("v1.0.0-beta"), (1, 0, 0))
