@@ -8,6 +8,24 @@ Magyar nyelvű, Python/Tkinter alapú asztali forgatókönyvíró prototípus. A
 - karakterlapok céllal, konfliktussal, leírással és háttértörténettel;
 - akció-, karakter-, párbeszéd- és instrukcióblokkok;
 - jelenetek átrendezése, keresés és csere, statisztikák;
+- jelenetduplikálás, élő szó-/karakterszámláló és Fountain-export;
+- jelenetkártya-tábla, dramaturgiai ív és induláskori autosave-visszaállítás;
+- projektvarázsló, navigátor, dialóguselemzés, fókuszmód, jelenetjegyzetek és exportcsomag.
+- produkciós bontás és mentett változatok közötti szöveges összehasonlítás.
+
+## Ubuntu/Debian csomag
+
+A telepíthető `.deb` csomag elkészítése:
+
+```bash
+./build_deb.sh
+```
+
+A csomag a `dist/fvg-story-editor_0.1.0_all.deb` útvonalon jön létre, telepítése pedig: `sudo apt install ./dist/fvg-story-editor_0.1.0_all.deb`.
+
+## Automatikus GitHub kiadás
+
+A `.github/workflows/release.yml` GitHub Actions munkafolyamat minden `v*` címkénél automatikusan elkészíti a `.deb` csomagot és GitHub Release-ként közzéteszi.
 - automatikus mentés hárompercenként;
 - verzióelőzmények és PDF-export;
 - induláskori komponensellenőrzés (Tkinter, ideiglenes fájlkezelés, ReportLab).
