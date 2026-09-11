@@ -2,6 +2,8 @@
 
 Magyar nyelvű, Python/Tkinter alapú asztali forgatókönyvíró prototípus. A natív projektformátum a `.fvgscript` (UTF-8-as JSON); minden mentés automatikusan visszaállítható verziót készít (legfeljebb 30 változat).
 
+Az alkalmazás Beat Sheetet és jelenethez kötött kamera-beállítási listát is tárol a projektben. A Beállítások menüben választható a magyar vagy angol felület; induláskor az alkalmazás a GitHub Release-ekből ellenőrzi, elérhető-e újabb verzió, és a megfelelő telepítő kiadási oldalát ajánlja fel.
+
 Licenc: [MIT](LICENSE). A kiadási változások a [CHANGELOG.md](CHANGELOG.md) fájlban találhatók.
 
 ## Funkciók
