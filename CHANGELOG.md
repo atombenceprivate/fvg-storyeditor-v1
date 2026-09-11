@@ -6,6 +6,10 @@ Az FVG Story Editor összes jelentősebb változását ez a fájl tartalmazza.
 
 ### Hozzáadva
 
+- Beat Sheet a történet fordulópontjainak sorrendezhető listájával.
+- Jelenethez köthető kamera-beállítási lista képkivágással, mozgással és technikai jegyzetekkel.
+- Magyar és angol alkalmazásnyelv-választó.
+- Háttérben futó GitHub Release verzióellenőrzés és frissítés-letöltési felajánlás.
 - Idővonal, produkciós összesítő, referenciaképek és moodboard-kezelés.
 - Fountain- és Final Draft (`.fdx`) import.
 - Hunspell-alapú magyar helyesírás-ellenőrzési integráció.
