@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=FVG Story Editor
+Comment=Magyar nyelvű forgatókönyvíró alkalmazás
+Exec=fvg-story-editor %f
+Terminal=false
+Categories=Office;TextEditor;
+Keywords=forgatókönyv;írás;szöveg;
+MimeType=application/x-fvgscript;
+StartupNotify=true
