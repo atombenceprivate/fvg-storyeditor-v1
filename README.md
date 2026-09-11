@@ -4,6 +4,8 @@ Magyar nyelvű, Python/Tkinter alapú asztali forgatókönyvíró prototípus. A
 
 Az alkalmazás Beat Sheetet és jelenethez kötött kamera-beállítási listát is tárol a projektben. A Beállítások menüben választható a magyar vagy angol felület; induláskor az alkalmazás a GitHub Release-ekből ellenőrzi, elérhető-e újabb verzió, és a megfelelő telepítő kiadási oldalát ajánlja fel.
 
+A v0.3 szerkesztői eszközei közé tartozik a WYSIWYG félkövér/dőlt/aláhúzott és igazító formázás, a jelenetállapotok, a nyomtatási előnézet, a projektszintű keresés és ellenőrzés, valamint a tíz időbélyeges automatikus mentést kezelő helyreállítási nézet. Az exportcsomag Beat Sheet- és shot-list CSV-t is tartalmaz.
+
 Licenc: [MIT](LICENSE). A kiadási változások a [CHANGELOG.md](CHANGELOG.md) fájlban találhatók.
 
 ## Funkciók
