@@ -46,6 +46,63 @@ SZOVEGEK = {
     },
 }
 
+# Az ablakok nagy része a klasszikus Tkinter vezérlőkből épül fel. Ezeket a
+# vékony burkolókat használjuk, hogy egy új eszközablak sem maradjon véletlenül
+# magyar feliratú, ha az alkalmazásnyelv angol.
+AKTIV_NYELV = "hu"
+ANGOL_FELIRATOK = {
+    "Új projekt varázsló…": "New project wizard…", "Verzióelőzmények…": "Version history…", "Exportálás PDF-be…": "Export PDF…", "Exportálás Fountainbe…": "Export Fountain…", "Exportcsomag készítése…": "Create export package…", "Fountain importálása…": "Import Fountain…", "Final Draft (.fdx) importálása…": "Import Final Draft (.fdx)…",
+    "Keresés és csere…": "Find and replace…", "Statisztikák…": "Statistics…", "Karakterlap szerkesztése…": "Edit character sheet…", "Aktuális jelenet kártyája…": "Current scene card…", "Jelenetkártya-tábla…": "Scene card board…", "Dramaturgiai ív…": "Story arc…", "Projekt-navigátor…": "Project navigator…", "Dialóguselemzés…": "Dialogue analysis…", "Jelenetjegyzetek…": "Scene notes…", "Produkciós bontás…": "Production breakdown…", "Verziók összehasonlítása…": "Compare versions…", "Idővonal nézet…": "Timeline view…", "Produkciós összesítő…": "Production summary…", "Referenciaképek / moodboard…": "Reference images / moodboard…", "Magyar helyesírás ellenőrzése…": "Hungarian spell check…", "Írási cél és fókuszmód…": "Writing goal and focus mode…", "Aktuális jelenet duplikálása": "Duplicate current scene", "Komponensek ellenőrzése": "Check components",
+    "A történeted itt kap formát.": "Your story takes shape here.", "Fejléc:": "Heading:", "Aktuális sor típusa:": "Current line type:", "A jelenet szövege:": "Scene text:", "Tipp: a neveket szabadon beírhatod a jelenet szövegébe.": "Tip: you can freely enter names in the scene text.", "Készen áll az írásra": "Ready to write", "+ Jelenet": "+ Scene", "Törlés": "Delete", "↑ Feljebb": "↑ Move up", "↓ Lejjebb": "↓ Move down", "Formázás alkalmazása": "Apply formatting", "Akció": "Action", "Karakter": "Character", "Párbeszéd": "Dialogue", "Zárójeles utasítás": "Parenthetical",
+    "Beat neve:": "Beat name:", "Kapcsolt jelenet:": "Linked scene:", "Jegyzet:": "Note:", "Szerkesztés": "Edit", "+ Beat": "+ Beat", "Kamera-beállítás": "Camera shot", "+ Beállítás": "+ Shot", "Beállítás": "Shot type", "Kameramozgás": "Camera movement", "Leírás / technikai megjegyzés:": "Description / technical notes:", "Nagytotál": "Extreme wide shot", "Totál": "Wide shot", "Kistotál": "Medium wide shot", "Féltotál": "Medium shot", "Közelkép": "Close-up", "Nagyközel": "Extreme close-up", "Részlet": "Insert", "Statikus": "Static", "Svenk": "Pan", "Kocsizás": "Dolly", "Daru": "Crane", "Kézikamera": "Handheld", "Mentés": "Save", "Bezárás": "Close", "Alkalmazás": "Apply", "Keresés": "Find", "Összes cseréje": "Replace all", "Keresett szöveg:": "Find text:", "Csere erre:": "Replace with:",
+    "ÚJ PROJEKT": "NEW PROJECT", "Válassz kiinduló sablont, majd nevezd el a történetet.": "Choose a starting template, then name your story.", "Projektcím": "Project title", "Sablon": "Template", "Játékfilm": "Feature film", "Rövidfilm": "Short film", "Sorozatepizód": "Series episode", "Üres projekt": "Empty project", "Jelenetek": "Scenes", "Karakterek": "Characters", "Dramaturgiai ív": "Story arc", "Napi szócél:": "Daily word goal:", "Fókuszmód bekapcsolása (teljes képernyő)": "Enable focus mode (full screen)",
+    "JELENETKÁRTYA": "SCENE CARD", "JELENETKÁRTYA-TÁBLA": "SCENE CARD BOARD", "JELENETJEGYZETEK": "SCENE NOTES", "PRODUKCIÓS BONTÁS": "PRODUCTION BREAKDOWN", "DRAMATURGIAI ÍV": "STORY ARC", "VERZIÓELŐZMÉNYEK": "VERSION HISTORY", "VERZIÓ-ÖSSZEHASONLÍTÁS": "VERSION COMPARISON", "ÍRÁSI CÉL": "WRITING GOAL", "TÖRTÉNETI IDŐVONAL": "STORY TIMELINE", "REFERENCIÁK ÉS MOODBOARD": "REFERENCES AND MOODBOARD", "KAMERA-BEÁLLÍTÁSI LISTA": "CAMERA SHOT LIST", "A történet fő fordulópontjai és a hozzájuk tartozó jelenetek.": "The story's key turning points and their scenes.", "Kattints egy kártyára a jelenet megnyitásához.": "Click a card to open its scene.", "Vesszővel elválasztott lista is megadható.": "You can enter a comma-separated list.",
+    "Jelenet duplikálása": "Duplicate scene", "Mentési hiba": "Save error", "Megnyitási hiba": "Open error", "Frissítés": "Update", "Helyesírás": "Spell check", "Magyar helyesírás": "Hungarian spell check", "PDF export": "PDF export", "Fountain export": "Fountain export", "Fountain import": "Fountain import", "Final Draft import": "Final Draft import", "Produkciós összesítő": "Production summary", "Exportcsomag": "Export package", "Forgatókönyv-statisztikák": "Screenplay statistics", "Karakterlap": "Character sheet", "Jelenetkártya": "Scene card", "Verzióelőzmények": "Version history", "Verziók összehasonlítása": "Compare versions", "Komponensellenőrzés": "Component check", "Új projekt": "New project", "Automatikus mentés": "Autosave", "Referenciaképek": "Reference images", "Minden fájl": "All files", "Képfájlok": "Image files",
+}
+
+def fordit(szoveg):
+    return ANGOL_FELIRATOK.get(szoveg, szoveg) if AKTIV_NYELV == "en" else szoveg
+
+_EredetiLabel, _EredetiButton, _EredetiCheckbutton, _EredetiLabelframe, _EredetiMenu = ttk.Label, ttk.Button, ttk.Checkbutton, ttk.Labelframe, tk.Menu
+class _ForditottLabel(_EredetiLabel):
+    def __init__(self, master=None, **kwargs):
+        if "text" in kwargs: kwargs["text"] = fordit(kwargs["text"])
+        super().__init__(master, **kwargs)
+class _ForditottButton(_EredetiButton):
+    def __init__(self, master=None, **kwargs):
+        if "text" in kwargs: kwargs["text"] = fordit(kwargs["text"])
+        super().__init__(master, **kwargs)
+class _ForditottCheckbutton(_EredetiCheckbutton):
+    def __init__(self, master=None, **kwargs):
+        if "text" in kwargs: kwargs["text"] = fordit(kwargs["text"])
+        super().__init__(master, **kwargs)
+class _ForditottLabelframe(_EredetiLabelframe):
+    def __init__(self, master=None, **kwargs):
+        if "text" in kwargs: kwargs["text"] = fordit(kwargs["text"])
+        super().__init__(master, **kwargs)
+class _ForditottMenu(_EredetiMenu):
+    def add_command(self, cnf={}, **kwargs):
+        if "label" in kwargs: kwargs["label"] = fordit(kwargs["label"])
+        return super().add_command(cnf, **kwargs)
+    def add_cascade(self, cnf={}, **kwargs):
+        if "label" in kwargs: kwargs["label"] = fordit(kwargs["label"])
+        return super().add_cascade(cnf, **kwargs)
+_EredetiTreeview = ttk.Treeview
+class _ForditottTreeview(_EredetiTreeview):
+    def heading(self, column, cnf=None, **kwargs):
+        if "text" in kwargs: kwargs["text"] = fordit(kwargs["text"])
+        return super().heading(column, cnf, **kwargs)
+ttk.Label, ttk.Button, ttk.Checkbutton, ttk.Labelframe, ttk.Treeview, tk.Menu = _ForditottLabel, _ForditottButton, _ForditottCheckbutton, _ForditottLabelframe, _ForditottTreeview, _ForditottMenu
+
+def _fordit_uzenet(fuggveny):
+    def burkolo(cim, uzenet=None, *args, **kwargs):
+        return fuggveny(fordit(cim), fordit(uzenet) if isinstance(uzenet, str) else uzenet, *args, **kwargs)
+    return burkolo
+messagebox.showinfo = _fordit_uzenet(messagebox.showinfo)
+messagebox.showerror = _fordit_uzenet(messagebox.showerror)
+messagebox.showwarning = _fordit_uzenet(messagebox.showwarning)
+messagebox.askyesno = _fordit_uzenet(messagebox.askyesno)
+
 
 class UvegGomb(tk.Canvas):
     """Lekerekített, üvegszerű gomb kizárólag Tkinterrel - Windows és Linux alatt is azonos."""
@@ -57,7 +114,7 @@ class UvegGomb(tk.Canvas):
             "kiemelt": "#f5a623", "kiemelt_aktiv": "#ffc04d", "szoveg": "#f4f7fb", "sotet": "#15191f",
         }
         betu = ("Sans", 10, "bold" if accent else "normal")
-        self.felirat = text
+        self.felirat = fordit(text)
         szelesseg = width or max(94, len(text) * 8 + 30)
         super().__init__(szulo, width=szelesseg, height=38, highlightthickness=0, bd=0, cursor="hand2", **kwargs)
         self.configure(bg=hatter, takefocus=1)
@@ -98,6 +155,8 @@ class ForgatokonyvIro(tk.Tk):
         super().__init__()
         self.beallitasok = self.beallitasok_betoltese()
         self.nyelv = self.beallitasok.get("nyelv", "hu")
+        global AKTIV_NYELV
+        AKTIV_NYELV = self.nyelv
         self.title("FVG Story Editor — Íróstúdió")
         self.geometry("1120x720")
         self.minsize(860, 550)
