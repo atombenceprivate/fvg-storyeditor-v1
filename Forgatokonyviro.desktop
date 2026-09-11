@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=FVG Story Editor
+Comment=Magyar nyelvű forgatókönyvíró alkalmazás
+Exec=/home/atombencepvt/Codex/fvg-storyeditor-v1/inditas.sh %f
+TryExec=/home/atombencepvt/Codex/fvg-storyeditor-v1/inditas.sh
+Path=/home/atombencepvt/Codex/fvg-storyeditor-v1
+Terminal=false
+DBusActivatable=false
+Categories=Office;TextEditor;
+Keywords=forgatókönyv;írás;szöveg;
+MimeType=application/x-fvgscript;
+StartupNotify=true

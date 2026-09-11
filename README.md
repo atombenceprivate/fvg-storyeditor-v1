@@ -1,0 +1,84 @@
+# FVG Story Editor
+
+Magyar nyelvű, Python/Tkinter alapú asztali forgatókönyvíró prototípus. A natív projektformátum a `.fvgscript` (UTF-8-as JSON); minden mentés automatikusan visszaállítható verziót készít (legfeljebb 30 változat).
+
+## Funkciók
+
+- jelenet-, karakter- és jelenetkártya-kezelés;
+- karakterlapok céllal, konfliktussal, leírással és háttértörténettel;
+- akció-, karakter-, párbeszéd- és instrukcióblokkok;
+- jelenetek átrendezése, keresés és csere, statisztikák;
+- automatikus mentés hárompercenként;
+- verzióelőzmények és PDF-export;
+- induláskori komponensellenőrzés (Tkinter, ideiglenes fájlkezelés, ReportLab).
+
+## Indítás
+
+### Első telepítés virtuális környezettel
+
+Linux/macOS alatt:
+
+```bash
+./telepites_venv.sh
+```
+
+Ha Ubuntu/Debian alatt a telepítő az `ensurepip` vagy `venv` hiányára panaszkodik, előbb futtasd:
+
+```bash
+sudo apt install python3.14-venv
+```
+
+Windows alatt kattints duplán a `telepites_venv_windows.bat` fájlra. A telepítő létrehozza a projektmappában a `.venv` könyvtárat, majd telepíti a `requirements.txt` függőségeit. Ezt csak első indításkor, illetve a függőségek változásakor kell lefuttatni.
+
+### Windowsos `.fvgscript` fájltársítás
+
+A virtuális környezet telepítése után futtasd egyszer a `telepites_windows_fajltarsitas.bat` fájlt. Ez kizárólag az aktuális felhasználó Windows-fájltársításait módosítja; ezután a `.fvgscript` fájl dupla kattintással az FVG Story Editorban nyílik meg. A társítás a `eltavolitas_windows_fajltarsitas.bat` futtatásával visszavonható.
+
+Linux/macOS:
+
+```bash
+python3 app.py
+```
+
+Windows alatt kattints duplán a `FVG Story Editor.bat` fájlra, vagy futtasd ezt a parancsot a projektmappában:
+
+```powershell
+py -3 app.py
+```
+
+Az alkalmazás jeleneteket és karaktereket kezel, a projektet pedig UTF-8-as JSON-fájlba menti (`.forgatokonyv.json`). A Tkinter a legtöbb Python 3 telepítés része, így nincs külön csomagtelepítés.
+
+A PDF-exporthoz telepítsd a ReportLab csomagot:
+
+```bash
+python3 -m pip install -r requirements.txt
+```
+
+Vagy Ubuntu rendszeren: `sudo apt install python3-reportlab`.
+
+Windows alatt a függőségek telepítése:
+
+```powershell
+py -3 -m pip install -r requirements.txt
+```
+
+Ubuntu/Debian rendszeren, ha a `tkinter` modul hiányzik:
+
+```bash
+sudo apt install python3-tk
+```
+
+## Ubuntu indítófájl
+
+A projektmappában lévő `Forgatokonyviro.desktop` fájlra jobb gombbal kattintva válaszd az **Indítás engedélyezése** lehetőséget, majd nyisd meg. A fájl a fájlkezelőből vagy az Asztalról is használható.
+
+Ha az alkalmazás mégsem indulna, a projektmappában automatikusan létrejövő `inditasi_hiba.log` tartalmazza a pontos hibát. Az indítást a `inditas.sh` végzi; ezt ne helyezd át a projektmappából.
+
+Ha az Ubuntu nem futtatja közvetlenül a mappában lévő `.desktop` fájlt, indítsd el egyszer terminálból a `bash telepites_alkalmazasok_koze.sh` parancsot. Ez felveszi a programot az Alkalmazások menübe, rendszergazdai jogosultság nélkül.
+
+## Következő logikus lépések
+
+- dialógus- és akcióblokkok formázása;
+- jelenetek átrendezése;
+- PDF vagy Fountain export;
+- automatikus mentés és szószám.
