@@ -32,6 +32,10 @@ A csomag a `dist/fvg-story-editor_0.1.0_all.deb` útvonalon jön létre, telepí
 A `.github/workflows/release.yml` GitHub Actions munkafolyamat minden `v*` címkénél automatikusan elkészíti a `.deb` csomagot és GitHub Release-ként közzéteszi.
 
 Ugyanez a kiadásfolyamat elkészíti a Windowsos önálló `FVGStoryEditor.exe` fájlt is. A `.github/workflows/ci.yml` minden `main` feltöltésnél és pull requestnél futtatja a szintaxis- és egységteszteket.
+
+## Windows NSIS telepítő
+
+Az NSIS telepítő forrása az `installer/fvg-story-editor.nsi`. A `build_nsis.sh` elkészíti a `dist/FVG-Story-Editor-Setup-0.2.0.exe` telepítőt, ha a `makensis` telepítve van. A GitHub kiadásfolyamat automatikusan felépíti és a Release-hez csatolja. A telepítő felhasználói szintre telepít, létrehozza a virtuális környezetet, felveszi a Start menübe, az Asztalra, valamint társítja a `.fvgscript` fájlokat. Python 3 szükséges hozzá; a telepítő ezt az induláskor ellenőrzi.
 - automatikus mentés hárompercenként;
 - verzióelőzmények és PDF-export;
 - induláskori komponensellenőrzés (Tkinter, ideiglenes fájlkezelés, ReportLab).
